@@ -1,6 +1,5 @@
 "use client"
 
-import AbstractGeometry from "@/components/abstract-geometry"
 import { motion } from "framer-motion"
 import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
