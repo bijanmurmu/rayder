@@ -26,11 +26,12 @@ export default function DynamicWeatherEngine({ weatherId, windSpeed, isDay, them
     const random = (min, max) => Math.random() * (max - min) + min
 
     // Determine conditions
-    const isRain = weatherId >= 300 && weatherId <= 531
-    const isSnow = weatherId >= 600 && weatherId <= 622
     const isThunder = weatherId >= 200 && weatherId <= 232
+    const isRain = (weatherId >= 300 && weatherId <= 531) || isThunder
+    const isSnow = weatherId >= 600 && weatherId <= 622
+    const isFog = weatherId >= 700 && weatherId <= 781
     const isClear = weatherId === 800
-    const isClouds = weatherId >= 801 && weatherId <= 804
+    const isClouds = (weatherId >= 801 && weatherId <= 804) || isFog
 
     // Colors - No longer rendering background in canvas, handled by CSS theme in page.tsx
     // We only use themeFg for particle color
@@ -38,16 +39,16 @@ export default function DynamicWeatherEngine({ weatherId, windSpeed, isDay, them
     // Initialize particles based on weather
     const initParticles = () => {
       particles.length = 0
-      const count = isRain ? 200 : isSnow ? 150 : isClouds ? 20 : isClear ? 50 : 100
+      const count = isRain ? 200 : isSnow ? 150 : isFog ? 15 : isClouds ? 25 : isClear ? 50 : 100
 
       for (let i = 0; i < count; i++) {
         particles.push({
           x: random(0, width),
           y: random(0, height),
-          size: isRain ? random(1, 3) : isSnow ? random(2, 5) : isClouds ? random(100, 300) : random(1, 3),
+          size: isRain ? random(1, 3) : isSnow ? random(2, 5) : isFog ? random(300, 600) : isClouds ? random(80, 200) : random(1, 3),
           speedY: isRain ? random(15, 25) : isSnow ? random(1, 3) : isClouds ? 0 : random(0.2, 1),
-          speedX: isClouds ? random(0.1, 0.5) : (windSpeed * random(0.5, 1.5)) / 2,
-          opacity: isClouds ? random(0.05, 0.15) : isClear ? random(0.2, 0.8) : random(0.4, 0.8),
+          speedX: isClouds ? random(0.1, 0.4) : (windSpeed * random(0.5, 1.5)) / 2,
+          opacity: isFog ? random(0.02, 0.08) : isClouds ? random(0.05, 0.15) : isClear ? random(0.2, 0.8) : random(0.4, 0.8),
           angle: random(0, Math.PI * 2)
         })
       }
@@ -61,6 +62,12 @@ export default function DynamicWeatherEngine({ weatherId, windSpeed, isDay, them
       // Use white for particles (opacity handles the blending)
       ctx.fillStyle = "#ffffff"
       ctx.strokeStyle = "#ffffff"
+
+      // Lightning flash
+      if (isThunder && Math.random() < 0.015) {
+        ctx.globalAlpha = random(0.2, 0.6)
+        ctx.fillRect(0, 0, width, height)
+      }
 
       particles.forEach((p) => {
         // Update positions
@@ -108,6 +115,9 @@ export default function DynamicWeatherEngine({ weatherId, windSpeed, isDay, them
         } else if (isClouds) {
           ctx.beginPath()
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+          ctx.arc(p.x + p.size * 1.2, p.y - p.size * 0.4, p.size * 1.3, 0, Math.PI * 2)
+          ctx.arc(p.x + p.size * 2.4, p.y, p.size * 1.1, 0, Math.PI * 2)
+          ctx.arc(p.x + p.size * 1.2, p.y + p.size * 0.4, p.size * 1.1, 0, Math.PI * 2)
           ctx.globalAlpha = p.opacity
           ctx.fill()
         }
