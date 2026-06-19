@@ -9,28 +9,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Latitude and longitude parameters are required" }, { status: 400 })
   }
 
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 500 })
-  }
-
   try {
     const response = await fetch(
-      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`,
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`,
+      { headers: { "User-Agent": "RayderWeatherApp/1.0" } }
     )
 
     if (!response.ok) {
-      const errorData = await response.json()
       return NextResponse.json(
-        { error: errorData.message || "Failed to fetch location data" },
+        { error: "Failed to fetch location data" },
         { status: response.status },
       )
     }
 
     const data = await response.json()
-    if (data && data.length > 0) {
-      return NextResponse.json(data[0])
+    if (data && data.address) {
+      const city = data.address.city || data.address.town || data.address.village || data.address.state || data.address.country;
+      return NextResponse.json({ name: city })
     } else {
       return NextResponse.json({ error: "No location found for the given coordinates" }, { status: 404 })
     }

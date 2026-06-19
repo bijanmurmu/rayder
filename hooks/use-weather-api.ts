@@ -56,35 +56,21 @@ export function useWeatherApi() {
 
       while (attempt <= maxRetries) {
         try {
-          // Use Promise.all to fetch data in parallel
-          const [weatherResponse, forecastResponse, airQualityResponse, alertsResponse] = await Promise.all([
-            fetch(`/api/weather?city=${encodeURIComponent(cityName)}`),
-            fetch(`/api/forecast?city=${encodeURIComponent(cityName)}`),
-            fetch(`/api/air-quality?city=${encodeURIComponent(cityName)}`),
-            fetch(`/api/alerts?city=${encodeURIComponent(cityName)}`),
-          ])
+          const response = await fetch(`/api/weather-all?city=${encodeURIComponent(cityName)}`);
 
-          // Handle client errors (4xx) immediately without retrying
-          if (weatherResponse.status >= 400 && weatherResponse.status < 500) {
-            const errorData = await weatherResponse.json()
+          if (response.status >= 400 && response.status < 500) {
+            const errorData = await response.json()
             throw new Error(errorData.error || "Failed to fetch weather data")
           }
 
-          if (forecastResponse.status >= 400 && forecastResponse.status < 500) {
-            const errorData = await forecastResponse.json()
-            throw new Error(errorData.error || "Failed to fetch forecast data")
+          if (!response.ok) {
+            throw new Error("Failed to fetch weather data")
           }
 
-          // Parse responses in parallel
-          const [weatherData, forecastData, airQualityData, alertsData] = await Promise.all([
-            weatherResponse.ok ? weatherResponse.json() : null,
-            forecastResponse.ok ? forecastResponse.json() : null,
-            airQualityResponse.ok ? airQualityResponse.json() : null,
-            alertsResponse.ok ? alertsResponse.json() : { alerts: [] },
-          ])
+          const data = await response.json()
 
-          if (!weatherData || !forecastData) {
-            throw new Error("Failed to fetch required weather data")
+          if (!data.weather || !data.forecast) {
+            throw new Error("Failed to parse required weather data")
           }
 
           // Set current date
@@ -97,10 +83,10 @@ export function useWeatherApi() {
           })
 
           const newState = {
-            weather: weatherData,
-            forecast: forecastData,
-            airQuality: airQualityData,
-            alerts: alertsData.alerts || [],
+            weather: data.weather,
+            forecast: data.forecast,
+            airQuality: data.airQuality,
+            alerts: data.alerts || [],
             currentDate: currentDateStr,
           }
 

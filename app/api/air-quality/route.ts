@@ -8,52 +8,46 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "City parameter is required" }, { status: 400 })
   }
 
-  const apiKey = process.env.OPENWEATHERMAP_API_KEY
-
-  if (!apiKey) {
-    return NextResponse.json({ error: "API key not configured" }, { status: 500 })
-  }
-
   try {
-    // First get coordinates for the city
-    const geoResponse = await fetch(`https://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`)
+    const geoResponse = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+    const geoData = await geoResponse.json();
+    
+    if (!geoData.results || geoData.results.length === 0) {
+      return NextResponse.json({ error: "City not found" }, { status: 404 });
+    }
+    
+    const { latitude, longitude } = geoData.results[0];
 
-    if (!geoResponse.ok) {
-      const errorData = await geoResponse.json()
-      return NextResponse.json(
-        { error: errorData.message || "Failed to fetch location data" },
-        { status: geoResponse.status },
-      )
+    const aqResponse = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=european_aqi,carbon_monoxide,nitrogen_dioxide,ozone,sulphur_dioxide,pm10,pm2_5,ammonia`);
+    
+    if (!aqResponse.ok) {
+       return NextResponse.json({ error: "Failed to fetch air quality data" }, { status: aqResponse.status });
     }
 
-    const geoData = await geoResponse.json()
+    const aqData = await aqResponse.json();
+    
+    let aqi = 1;
+    const eaqi = aqData.current.european_aqi;
+    if (eaqi > 20) aqi = 2;
+    if (eaqi > 40) aqi = 3;
+    if (eaqi > 60) aqi = 4;
+    if (eaqi > 80) aqi = 5;
 
-    if (!geoData || geoData.length === 0) {
-      return NextResponse.json({ error: "Location not found" }, { status: 404 })
-    }
+    const mappedAq = {
+      main: { aqi },
+      components: {
+        co: aqData.current.carbon_monoxide || 0,
+        no: 0, 
+        no2: aqData.current.nitrogen_dioxide || 0,
+        o3: aqData.current.ozone || 0,
+        so2: aqData.current.sulphur_dioxide || 0,
+        pm2_5: aqData.current.pm2_5 || 0,
+        pm10: aqData.current.pm10 || 0,
+        nh3: aqData.current.ammonia || 0,
+      }
+    };
 
-    const { lat, lon } = geoData[0]
-
-    // Then get air quality data using coordinates
-    const airQualityResponse = await fetch(
-      `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`,
-    )
-
-    if (!airQualityResponse.ok) {
-      const errorData = await airQualityResponse.json()
-      return NextResponse.json(
-        { error: errorData.message || "Failed to fetch air quality data" },
-        { status: airQualityResponse.status },
-      )
-    }
-
-    const airQualityData = await airQualityResponse.json()
-
-    if (airQualityData && airQualityData.list && airQualityData.list.length > 0) {
-      return NextResponse.json(airQualityData.list[0])
-    } else {
-      return NextResponse.json({ error: "No air quality data available" }, { status: 404 })
-    }
+    return NextResponse.json(mappedAq)
   } catch (error) {
     console.error("Error fetching air quality data:", error)
     return NextResponse.json({ error: "Failed to fetch air quality data" }, { status: 500 })

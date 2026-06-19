@@ -1,14 +1,35 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Thermometer, Droplets, Wind } from "lucide-react"
+import { Thermometer, Droplets, Wind, CloudRain } from "lucide-react"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import React from "react"
 
-function WeatherForecast({ forecast, isMetric = true, isDarkMode = false }) {
+function WeatherForecast({ forecast, isMetric = true, theme }) {
   const [selectedDay, setSelectedDay] = useState(null)
+
+  // Determine an elegant background tint based on the weather conditions
+  const getWeatherGradient = (forecast) => {
+    if (!forecast) return "none";
+    const desc = forecast.description.toLowerCase();
+    
+    if (desc.includes("clear") || desc.includes("sun")) {
+      return "radial-gradient(circle at top right, rgba(251, 146, 60, 0.2), transparent 70%)"; // Sunset Amber
+    }
+    if (desc.includes("rain") || desc.includes("storm") || desc.includes("thunder") || desc.includes("drizzle")) {
+      return "radial-gradient(circle at top right, rgba(59, 130, 246, 0.2), transparent 70%)"; // Deep Rain Blue
+    }
+    if (desc.includes("snow") || desc.includes("ice")) {
+      return "radial-gradient(circle at top right, rgba(248, 250, 252, 0.2), transparent 70%)"; // Ice White
+    }
+    if (desc.includes("cloud") || desc.includes("overcast") || desc.includes("fog")) {
+      return "radial-gradient(circle at top right, rgba(148, 163, 184, 0.15), transparent 70%)"; // Slate
+    }
+    
+    return "radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 70%)";
+  }
 
   // Group forecast data by day
   const groupByDay = (data) => {
@@ -86,8 +107,9 @@ function WeatherForecast({ forecast, isMetric = true, isDarkMode = false }) {
         description: item.weather[0].description,
         humidity: item.main.humidity,
         windSpeed: item.wind.speed,
-        pop: item.pop, // Probability of precipitation
+        pop: item.pop || 0, // Probability of precipitation
       })),
+      pop: Math.max(...dayData.items.map((item) => item.pop || 0)),
     }
   }
 
@@ -143,6 +165,7 @@ function WeatherForecast({ forecast, isMetric = true, isDarkMode = false }) {
         forecast: {
           ...lastDayForecast,
           description: "Estimated forecast",
+          pop: lastDayForecast.pop || 0,
         },
       })
     }
@@ -173,175 +196,190 @@ function WeatherForecast({ forecast, isMetric = true, isDarkMode = false }) {
 
   return (
     <>
-      <Card className={cn("backdrop-blur-md border-none text-white", isDarkMode ? "bg-gray-800/30" : "bg-white/10")}>
-        <CardHeader className="p-3 sm:p-4">
-          <CardTitle className="text-base sm:text-lg">Next 6 Days Forecast</CardTitle>
-        </CardHeader>
-        <CardContent className="p-3 sm:p-4 pt-0">
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
-            {forecastDays.map((day) => {
-              const dayData = groupedForecast[day]
-              const forecast = getDailyData(dayData)
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 pt-4">
+        {forecastDays.map((day) => {
+          const dayData = groupedForecast[day]
+          const forecast = getDailyData(dayData)
 
-              return (
-                <div
-                  key={day}
-                  className={cn(
-                    "rounded-lg p-2 flex flex-col items-center hover:bg-white/20 transition-colors cursor-pointer active:bg-white/30 touch-action-manipulation",
-                    isDarkMode ? "bg-gray-700/30" : "bg-white/10",
-                  )}
-                  onClick={() => handleDayClick(day)}
-                >
-                  <div className="font-bold text-xs sm:text-sm">{day}</div>
-                  <div className="text-[10px] sm:text-xs text-white/80 mb-1">{dayData.fullDate}</div>
-                  <img
-                    src={`https://openweathermap.org/img/wn/${forecast.icon}.png`}
-                    alt={forecast.description}
-                    className="w-10 h-10 sm:w-12 sm:h-12"
-                  />
-                  <div className="text-[10px] sm:text-xs capitalize mb-1 line-clamp-1">{forecast.description}</div>
-                  <div className="flex items-center gap-1 mb-1">
-                    <Thermometer className="h-2 w-2 sm:h-3 sm:w-3" />
-                    <span className="text-[10px] sm:text-xs">
-                      {convertTemp(forecast.minTemp)}° / {convertTemp(forecast.maxTemp)}°
-                    </span>
+          return (
+            <div
+              key={day}
+              className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/20 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/40 transition-colors cursor-pointer group"
+              onClick={() => handleDayClick(day)}
+            >
+              <div className="font-medium text-xl md:text-2xl tracking-tight">{day}</div>
+              <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{dayData.fullDate}</div>
+              
+              <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight break-words hyphens-auto line-clamp-3">
+                {forecast.description}
+              </div>
+              
+              <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex justify-between items-end gap-2">
+                <div className="flex flex-col w-12 shrink-0 gap-1.5">
+                  <div className="flex items-center gap-1 opacity-70">
+                    <CloudRain size={10} className="text-blue-400" />
+                    <span className="text-[9px] font-semibold tracking-widest uppercase">Rain</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Droplets className="h-2 w-2 sm:h-3 sm:w-3" />
-                    <span className="text-[10px] sm:text-xs">{forecast.humidity}%</span>
+                  <div className="h-1.5 w-full bg-[color:var(--theme-fg)]/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.round(forecast.pop * 100)}%` }} />
                   </div>
+                  <span className="text-[10px] font-semibold tracking-wider text-blue-400/80">{Math.round(forecast.pop * 100)}%</span>
                 </div>
-              )
-            })}
-
-            {extraDays.map((day, index) => (
-              <div
-                key={`extra-${index}`}
-                className={cn(
-                  "rounded-lg p-2 flex flex-col items-center hover:bg-white/20 transition-colors cursor-pointer active:bg-white/30 touch-action-manipulation",
-                  isDarkMode ? "bg-gray-700/30" : "bg-white/10",
-                )}
-                onClick={() => handleDayClick(day, true)}
-              >
-                <div className="font-bold text-xs sm:text-sm">{day.dayName}</div>
-                <div className="text-[10px] sm:text-xs text-white/80 mb-1">{day.fullDate}</div>
-                <img
-                  src={`https://openweathermap.org/img/wn/${day.forecast.icon}.png`}
-                  alt="Estimated forecast"
-                  className="w-10 h-10 sm:w-12 sm:h-12 opacity-80"
-                />
-                <div className="text-[10px] sm:text-xs capitalize mb-1 line-clamp-1">Estimated</div>
-                <div className="flex items-center gap-1 mb-1">
-                  <Thermometer className="h-2 w-2 sm:h-3 sm:w-3" />
-                  <span className="text-[10px] sm:text-xs">
-                    {convertTemp(day.forecast.minTemp)}° / {convertTemp(day.forecast.maxTemp)}°
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Droplets className="h-2 w-2 sm:h-3 sm:w-3" />
-                  <span className="text-[10px] sm:text-xs">{day.forecast.humidity}%</span>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1 opacity-50">
+                    <Thermometer size={10} />
+                    <span className="text-[9px] font-semibold tracking-widest uppercase">Temp</span>
+                  </div>
+                  <div className="text-xl font-medium whitespace-nowrap">
+                    {convertTemp(forecast.maxTemp)}°<span className="opacity-50 text-sm ml-1">/{convertTemp(forecast.minTemp)}°</span>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          )
+        })}
 
-      {/* Mobile-friendly dialog for day details */}
+        {extraDays.map((day, index) => (
+          <div
+            key={`extra-${index}`}
+            className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/10 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/30 transition-colors cursor-pointer group opacity-80 hover:opacity-100"
+            onClick={() => handleDayClick(day, true)}
+          >
+            <div className="font-medium text-xl md:text-2xl tracking-tight">{day.dayName}</div>
+            <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{day.fullDate}</div>
+            
+            <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight opacity-70">
+              Estimated Trend
+            </div>
+            
+            <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex justify-between items-end">
+              <div className="text-xl font-medium">
+                {convertTemp(day.forecast.maxTemp)}°<span className="opacity-50 text-sm ml-1">/{convertTemp(day.forecast.minTemp)}°</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Dialog open={selectedDay !== null} onOpenChange={(open) => !open && setSelectedDay(null)}>
-        <DialogContent
-          className={cn(
-            "border-none text-white sm:max-w-md max-h-[90vh] overflow-y-auto",
-            isDarkMode ? "bg-gray-900/95" : "bg-gray-800/95",
-          )}
+        <DialogContent 
+          className="border border-[color:var(--theme-border)] p-5 md:p-8 max-w-2xl w-[95vw] md:w-full rounded-2xl md:rounded-3xl shadow-2xl max-h-[85vh] overflow-y-auto"
+          style={{
+            backgroundColor: theme?.bg || '#000',
+            color: theme?.fg || '#fff',
+            backgroundImage: selectedDay ? getWeatherGradient(selectedDay.forecast) : 'none',
+            '--theme-bg': theme?.bg,
+            '--theme-fg': theme?.fg,
+            '--theme-border': theme?.border
+          }}
         >
-          <DialogHeader>
-            <DialogTitle className="text-center text-base sm:text-lg">
-              {selectedDay?.name}, {selectedDay?.fullDate}
-              {selectedDay?.isEstimated && " (Estimated)"}
+          <DialogHeader className="relative z-10">
+            <DialogTitle className="text-3xl font-light tracking-tight">
+              {selectedDay?.name}, <span className="opacity-50">{selectedDay?.fullDate}</span>
+              {selectedDay?.isEstimated && <span className="text-sm ml-2 opacity-50 bg-[color:var(--theme-fg)] text-[color:var(--theme-bg)] px-2 py-1 rounded-full">Estimated</span>}
             </DialogTitle>
           </DialogHeader>
 
           {selectedDay && (
-            <div className="flex flex-col items-center gap-3 px-1">
-              <div className="flex items-center gap-3">
-                <img
-                  src={`https://openweathermap.org/img/wn/${selectedDay.forecast.icon}@2x.png`}
-                  alt={selectedDay.forecast.description}
-                  className="w-14 h-14 sm:w-16 sm:h-16"
-                />
-                <div>
-                  <p className="text-sm sm:text-base capitalize line-clamp-2">{selectedDay.forecast.description}</p>
-                  <p className="text-lg sm:text-xl font-bold">
-                    {convertTemp(selectedDay.forecast.minTemp)}° / {convertTemp(selectedDay.forecast.maxTemp)}°
-                    {isMetric ? "C" : "F"}
-                  </p>
+            <div className="flex flex-col gap-8 mt-6">
+              <div className="border-b border-[color:var(--theme-border)] pb-6 md:pb-8 flex flex-col md:flex-row items-start md:items-end justify-between gap-2 md:gap-4">
+                <div className="text-3xl md:text-5xl font-light capitalize leading-tight w-full md:w-2/3 break-words hyphens-auto">
+                  {selectedDay.forecast.description}
+                </div>
+                <div className="text-3xl md:text-4xl font-medium whitespace-nowrap">
+                  {convertTemp(selectedDay.forecast.maxTemp)}°<span className="opacity-50 text-xl md:text-2xl ml-1">/{convertTemp(selectedDay.forecast.minTemp)}°</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 w-full">
-                <div
-                  className={cn(
-                    "p-2 sm:p-3 rounded-lg flex items-center gap-2",
-                    isDarkMode ? "bg-gray-700/50" : "bg-white/10",
-                  )}
-                >
-                  <Droplets className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs">Humidity</p>
-                    <p className="font-bold text-sm truncate">{selectedDay.forecast.humidity}%</p>
-                  </div>
+              <div className="grid grid-cols-2 gap-4 md:gap-6 font-medium text-base md:text-lg">
+                <div className="flex flex-col gap-1 p-4 rounded-xl bg-[color:var(--theme-fg)]/5">
+                  <span className="opacity-50 text-sm uppercase tracking-wider">Humidity</span>
+                  {selectedDay.forecast.humidity}%
                 </div>
-                <div
-                  className={cn(
-                    "p-2 sm:p-3 rounded-lg flex items-center gap-2",
-                    isDarkMode ? "bg-gray-700/50" : "bg-white/10",
-                  )}
-                >
-                  <Wind className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs">Wind Speed</p>
-                    <p className="font-bold text-sm truncate">
-                      {convertSpeed(selectedDay.forecast.windSpeed)} {getSpeedUnit()}
-                    </p>
-                  </div>
+                <div className="flex flex-col gap-1 p-4 rounded-xl bg-[color:var(--theme-fg)]/5">
+                  <span className="opacity-50 text-sm uppercase tracking-wider">Wind</span>
+                  {convertSpeed(selectedDay.forecast.windSpeed)} {getSpeedUnit()}
                 </div>
               </div>
 
               {!selectedDay.isEstimated && selectedDay.hourlyData && (
-                <div className="w-full">
-                  <h3 className="text-xs sm:text-sm font-medium mb-2">Hourly Forecast</h3>
-                  <div className="grid grid-cols-4 gap-1 sm:gap-2 w-full">
-                    {selectedDay.hourlyData.slice(0, 8).map((hour, idx) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          "flex flex-col items-center p-1 sm:p-2 rounded-lg",
-                          isDarkMode ? "bg-gray-700/50" : "bg-white/10",
-                        )}
-                      >
-                        <div className="text-[10px] sm:text-xs">{hour.time}:00</div>
-                        <img
-                          src={`https://openweathermap.org/img/wn/${hour.icon}.png`}
-                          alt={hour.description}
-                          className="w-6 h-6 sm:w-8 sm:h-8"
-                        />
-                        <div className="text-[10px] sm:text-xs font-bold">{convertTemp(hour.temp)}°</div>
-                        {hour.pop > 0 && (
-                          <div className="text-[9px] sm:text-[10px] text-blue-300">{Math.round(hour.pop * 100)}%</div>
-                        )}
-                      </div>
-                    ))}
+                <div className="mt-4 border-t border-[color:var(--theme-border)] pt-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <h3 className="text-lg font-medium tracking-wide opacity-70">Hourly Temperature Curve</h3>
                   </div>
+                  
+                  {(() => {
+                    const items = selectedDay.hourlyData.slice(0, 8);
+                    const temps = items.map(h => convertTemp(h.temp));
+                    const minT = Math.min(...temps);
+                    const maxT = Math.max(...temps);
+                    const range = maxT - minT || 1;
+                    
+                    const points = temps.map((t, i) => {
+                      const x = (i / 7) * 1000;
+                      const y = 80 - ((t - minT) / range) * 60; // range 20 to 80
+                      return `${x},${y}`;
+                    });
+
+                    return (
+                      <div className="w-full flex flex-col relative">
+                        <svg viewBox="0 0 1000 100" className="w-full h-24 overflow-visible" preserveAspectRatio="none">
+                          <defs>
+                            <linearGradient id="curveGrad" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor="currentColor" stopOpacity="0.2"/>
+                              <stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <polyline 
+                            points={`0,100 ${points.join(' ')} 1000,100`} 
+                            fill="url(#curveGrad)"
+                          />
+                          <polyline 
+                            points={points.join(' ')} 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="4" 
+                            vectorEffect="non-scaling-stroke"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        
+                        <div className="flex justify-between mt-4 relative w-full px-[2%]">
+                          {items.map((hour, idx) => (
+                            <div key={idx} className="flex flex-col items-center flex-1 relative z-10">
+                              <div className="text-xs font-medium opacity-70 mb-1">{hour.time}:00</div>
+                              
+                              <div className="flex items-center gap-1 mt-1 opacity-50">
+                                <Thermometer size={10} />
+                              </div>
+                              <div className="text-lg font-medium mb-1">{convertTemp(hour.temp)}°</div>
+                              
+                              <div className="flex flex-col gap-1 items-center mt-3 w-8">
+                                <div className="flex items-center gap-1 opacity-70">
+                                  <CloudRain size={10} className="text-blue-400" />
+                                </div>
+                                <div className="h-8 w-1.5 bg-[color:var(--theme-fg)]/10 rounded-full flex flex-col justify-end overflow-hidden mt-1">
+                                  <div className="w-full bg-blue-500 rounded-full" style={{ height: `${hour.pop * 100}%` }} />
+                                </div>
+                                {hour.pop > 0 ? (
+                                  <div className="text-[9px] font-semibold text-blue-400 mt-0.5">{(hour.pop * 100).toFixed(0)}%</div>
+                                ) : (
+                                  <div className="text-[9px] opacity-0 mt-0.5">-</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 
               {selectedDay.isEstimated && (
-                <div className={cn("text-center p-2 rounded-lg w-full", isDarkMode ? "bg-gray-700/50" : "bg-white/10")}>
-                  <p className="text-xs sm:text-sm">
-                    This is an estimated forecast based on trends from available data.
-                  </p>
-                  <p className="text-[10px] sm:text-xs mt-1 text-white/70">Actual weather conditions may vary.</p>
+                <div className="mt-4 p-4 rounded-xl bg-[color:var(--theme-fg)]/5 text-center text-sm font-medium opacity-70">
+                  This is a long-range trend estimate. Detailed hourly data is unavailable.
                 </div>
               )}
             </div>

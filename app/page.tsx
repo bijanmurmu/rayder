@@ -1,71 +1,42 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import {
-  Search,
-  MapPin,
-  Droplets,
-  Wind,
-  Sunrise,
-  Sunset,
-  Thermometer,
-  RefreshCw,
-  ThermometerSnowflake,
-  Gauge,
-  Share2,
-  Star,
-  Moon,
-  Sun,
-  Layers,
-} from "lucide-react"
-import Image from "next/image"
+import AbstractGeometry from "@/components/abstract-geometry"
+import { motion } from "framer-motion"
+import { useState, useEffect, useRef } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useToast } from "@/hooks/use-toast"
-import dynamic from "next/dynamic"
-import WeatherForecast from "@/components/weather-forecast"
-import ErrorBoundary from "@/components/error-boundary"
-import RecentSearches from "@/components/recent-searches"
-import WeatherAlerts from "@/components/weather-alerts"
 import { useWeatherApi } from "@/hooks/use-weather-api"
 import { useWeatherPreferences } from "@/hooks/use-weather-preferences"
-import { cn } from "@/lib/utils"
-import Navbar from "@/components/navbar"
+import WeatherForecast from "@/components/weather-forecast"
+import dynamic from "next/dynamic"
+import DynamicWeatherEngine from "@/components/dynamic-weather-engine"
+import { Search, Map as MapIcon, Calendar, Home, Wind, Droplets, Thermometer, CloudRain, Sunrise, Sunset, Gauge, Activity } from "lucide-react"
 
-// Dynamically import heavy components
-const WeatherMap = dynamic(() => import("@/components/weather-map"), {
-  loading: () => <Skeleton className="w-full h-[400px] bg-white/10" />,
-  ssr: false,
-})
+const WeatherMap = dynamic(() => import("@/components/weather-map"), { ssr: false })
 
 export default function WeatherApp() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [favoriteLocations, setFavoriteLocations] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("favoriteLocations")
-      return saved ? JSON.parse(saved) : []
-    }
-    return []
-  })
-  const [showMap, setShowMap] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const { toast } = useToast()
+  const [view, setView] = useState("HOME") 
+  const searchInputRef = useRef(null)
 
-  // Use our custom hooks
-  const { preferences, toggleUnits, toggleDarkMode, addRecentSearch, clearRecentSearches } = useWeatherPreferences()
-  const { weather, forecast, airQuality, alerts, loading, error, currentDate, fetchWeather } = useWeatherApi()
-
-  const { isMetric, isDarkMode, recentSearches } = preferences
+  const { preferences, toggleUnits } = useWeatherPreferences()
+  const { weather, forecast, airQuality, loading, error, fetchWeather } = useWeatherApi()
+  const { isMetric } = preferences
 
   useEffect(() => {
-    // Try to get user's location on initial load
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        if (searchInputRef.current) {
+          searchInputRef.current.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -79,189 +50,25 @@ export default function WeatherApp() {
                 return
               }
             }
-            // Fallback to default city if geocoding fails
             fetchWeather("Kolkata")
-          } catch (error) {
-            console.error("Error getting location:", error)
+          } catch (err) {
             fetchWeather("Kolkata")
           }
         },
-        // If user denies location or any error occurs, use default city
         () => fetchWeather("Kolkata"),
       )
     } else {
-      // Geolocation not supported, use default city
       fetchWeather("Kolkata")
     }
-
-    // Add preconnect for OpenWeatherMap
-    const link = document.createElement("link")
-    link.rel = "preconnect"
-    link.href = "https://openweathermap.org"
-    document.head.appendChild(link)
-
-    return () => {
-      document.head.removeChild(link)
-    }
   }, [fetchWeather])
-
-  // Save favorites to localStorage when they change
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("favoriteLocations", JSON.stringify(favoriteLocations))
-    }
-  }, [favoriteLocations])
 
   const handleSearch = (e) => {
     e.preventDefault()
     if (searchQuery.trim()) {
       fetchWeather(searchQuery)
-      addRecentSearch(searchQuery)
       setSearchQuery("")
+      setView("HOME")
     }
-  }
-
-  const handleRecentSearch = (city) => {
-    fetchWeather(city)
-    setIsSearchOpen(false)
-  }
-
-  const handleRefresh = () => {
-    setRefreshing(true)
-    if (weather) {
-      fetchWeather(weather.name, true).finally(() => {
-        setRefreshing(false)
-      })
-    } else {
-      setRefreshing(false)
-    }
-  }
-
-  const toggleFavorite = () => {
-    if (!weather) return
-
-    const locationName = `${weather.name}, ${weather.sys.country}`
-
-    if (favoriteLocations.some((loc) => loc.name === locationName)) {
-      setFavoriteLocations(favoriteLocations.filter((loc) => loc.name !== locationName))
-      toast({
-        title: "Removed from favorites",
-        description: `${locationName} has been removed from your favorites.`,
-      })
-    } else {
-      setFavoriteLocations([
-        ...favoriteLocations,
-        {
-          name: locationName,
-          city: weather.name,
-        },
-      ])
-      toast({
-        title: "Added to favorites",
-        description: `${locationName} has been added to your favorites.`,
-      })
-    }
-  }
-
-  const isFavorite = () => {
-    if (!weather) return false
-    const locationName = `${weather.name}, ${weather.sys.country}`
-    return favoriteLocations.some((loc) => loc.name === locationName)
-  }
-
-  const shareWeather = async () => {
-    if (!weather) return
-
-    const shareData = {
-      title: `Weather in ${weather.name}`,
-      text: `Current weather in ${weather.name}: ${weather.weather[0].description}, ${Math.round(weather.main.temp)}°${isMetric ? "C" : "F"}`,
-      url: window.location.href,
-    }
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData)
-      } else {
-        // Fallback for browsers that don't support the Web Share API
-        navigator.clipboard.writeText(`${shareData.title} - ${shareData.text}`)
-        toast({
-          title: "Copied to clipboard",
-          description: "Weather information has been copied to your clipboard.",
-        })
-      }
-    } catch (err) {
-      console.error("Error sharing:", err)
-    }
-  }
-
-  const getBackgroundClass = () => {
-    if (!weather)
-      return isDarkMode ? "bg-gradient-to-br from-gray-900 to-gray-800" : "bg-gradient-to-br from-blue-400 to-blue-700"
-
-    const id = weather.weather[0].id
-    const isDay = weather.dt > weather.sys.sunrise && weather.dt < weather.sys.sunset
-
-    if (isDarkMode) {
-      // Dark mode backgrounds
-      // Clear sky
-      if (id === 800) {
-        return isDay ? "bg-gradient-to-br from-blue-900 to-gray-900" : "bg-gradient-to-br from-gray-900 to-blue-950"
-      }
-      // Clouds
-      else if (id >= 801 && id <= 804) {
-        return "bg-gradient-to-br from-gray-800 to-gray-900"
-      }
-      // Rain, drizzle
-      else if ((id >= 300 && id <= 321) || (id >= 500 && id <= 531)) {
-        return "bg-gradient-to-br from-gray-900 to-blue-950"
-      }
-      // Thunderstorm
-      else if (id >= 200 && id <= 232) {
-        return "bg-gradient-to-br from-gray-900 to-purple-950"
-      }
-      // Snow
-      else if (id >= 600 && id <= 622) {
-        return "bg-gradient-to-br from-gray-800 to-blue-950"
-      }
-      // Atmosphere (fog, mist, etc)
-      else if (id >= 701 && id <= 781) {
-        return "bg-gradient-to-br from-gray-800 to-gray-900"
-      }
-
-      return "bg-gradient-to-br from-gray-900 to-gray-800"
-    } else {
-      // Light mode backgrounds
-      // Clear sky
-      if (id === 800) {
-        return isDay ? "bg-gradient-to-br from-sky-400 to-blue-600" : "bg-gradient-to-br from-indigo-900 to-blue-950"
-      }
-      // Clouds
-      else if (id >= 801 && id <= 804) {
-        return isDay ? "bg-gradient-to-br from-gray-300 to-blue-500" : "bg-gradient-to-br from-gray-800 to-blue-900"
-      }
-      // Rain, drizzle
-      else if ((id >= 300 && id <= 321) || (id >= 500 && id <= 531)) {
-        return "bg-gradient-to-br from-gray-400 to-blue-800"
-      }
-      // Thunderstorm
-      else if (id >= 200 && id <= 232) {
-        return "bg-gradient-to-br from-gray-700 to-blue-950"
-      }
-      // Snow
-      else if (id >= 600 && id <= 622) {
-        return "bg-gradient-to-br from-blue-100 to-blue-300"
-      }
-      // Atmosphere (fog, mist, etc)
-      else if (id >= 701 && id <= 781) {
-        return "bg-gradient-to-br from-gray-400 to-gray-600"
-      }
-
-      return "bg-gradient-to-br from-blue-400 to-blue-700"
-    }
-  }
-
-  const formatTime = (timestamp) => {
-    return new Date(timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
   const convertTemp = (temp) => {
@@ -278,511 +85,288 @@ export default function WeatherApp() {
 
   const getAirQualityLabel = (aqi) => {
     switch (aqi) {
-      case 1:
-        return { label: "Good", color: "bg-green-500" }
-      case 2:
-        return { label: "Fair", color: "bg-yellow-500" }
-      case 3:
-        return { label: "Moderate", color: "bg-orange-500" }
-      case 4:
-        return { label: "Poor", color: "bg-red-500" }
-      case 5:
-        return { label: "Very Poor", color: "bg-purple-500" }
-      default:
-        return { label: "Unknown", color: "bg-gray-500" }
+      case 1: return { label: "GOOD", color: "text-emerald-400" }
+      case 2: return { label: "FAIR", color: "text-green-400" }
+      case 3: return { label: "MODERATE", color: "text-yellow-400" }
+      case 4: return { label: "POOR", color: "text-orange-400" }
+      case 5: return { label: "TOXIC", color: "text-red-500" }
+      default: return { label: "UNKNOWN", color: "text-slate-400" }
     }
   }
 
-  return (
-    <div className={cn("min-h-screen flex flex-col transition-colors duration-500", getBackgroundClass())}>
-      {/* Skip to main content link for accessibility */}
-      <a
-        href="#main-weather-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-blue-600 text-white px-4 py-2 rounded-md z-50"
-      >
-        Skip to main content
-      </a>
+  const formatTime = (timestamp) => {
+    return new Date(timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+  }
 
-      {/* Header with navigation */}
-      <header role="banner">
-        <Navbar
-          isDarkMode={isDarkMode}
-          isMetric={isMetric}
-          onToggleDarkMode={toggleDarkMode}
-          onToggleUnits={toggleUnits}
-        />
+  const isDay = weather ? (Date.now() / 1000 > weather.sys.sunrise && Date.now() / 1000 < weather.sys.sunset) : true
+
+  // CINEMATIC MINIMALIST THEME
+  const getTheme = () => {
+    if (!weather) return { bg: "#0F172A", fg: "#FFFFFF", border: "rgba(255,255,255,0.1)" }
+    const id = weather.weather[0].id
+    
+    // Thunder - Deep stormy charcoal
+    if (id >= 200 && id <= 232) return { bg: "#111827", fg: "#E5E7EB", border: "rgba(255,255,255,0.1)" } 
+    // Rain/Drizzle - Muted slate blue
+    if (id >= 300 && id <= 531) return { bg: "#1E293B", fg: "#F8FAFC", border: "rgba(255,255,255,0.15)" } 
+    // Snow - Frosty silver
+    if (id >= 600 && id <= 622) return { bg: "#E2E8F0", fg: "#0F172A", border: "rgba(0,0,0,0.1)" } 
+    // Clear
+    if (id === 800) return isDay ? { bg: "#5DA2D5", fg: "#FFFFFF", border: "rgba(255,255,255,0.2)" } : { bg: "#0F172A", fg: "#F8FAFC", border: "rgba(255,255,255,0.1)" }
+    // Clouds
+    if (id >= 801 && id <= 804) return isDay ? { bg: "#94A3B8", fg: "#FFFFFF", border: "rgba(255,255,255,0.2)" } : { bg: "#1E293B", fg: "#E2E8F0", border: "rgba(255,255,255,0.1)" }
+    
+    return { bg: "#0F172A", fg: "#FFFFFF", border: "rgba(255,255,255,0.1)" }
+  }
+
+  const theme = getTheme()
+
+  return (
+    <div 
+      className="font-sans min-h-[100dvh] flex flex-col selection:bg-current selection:text-[color:var(--theme-bg)] transition-colors duration-1000"
+      style={{ 
+        backgroundColor: theme.bg, 
+        color: theme.fg,
+        '--theme-bg': theme.bg,
+        '--theme-fg': theme.fg,
+        '--theme-border': theme.border
+      }}
+    >
+      {weather && <DynamicWeatherEngine weatherId={weather.weather[0].id} windSpeed={weather.wind.speed} isDay={isDay} themeBg={theme.bg} themeFg={theme.fg} />}
+      
+      {/* HEADER */}
+      <header className="flex-none w-full h-20 border-b border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/60 backdrop-blur-xl z-50 px-6 md:px-12 flex items-center justify-between sticky top-0">
+        <div className="text-2xl font-light tracking-wider">Rayder<span className="font-semibold">Weather</span></div>
+        
+        <form onSubmit={handleSearch} className="hidden md:flex h-10 w-[400px] relative">
+          <Search className="absolute left-3 top-2.5 h-5 w-5 opacity-50" />
+          <Input 
+             ref={searchInputRef}
+             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+             placeholder="Search a city... (Cmd+K)"
+             className="h-full w-full bg-transparent border border-[color:var(--theme-border)] rounded-full pl-10 pr-4 text-sm font-medium focus-visible:ring-1 focus-visible:ring-[color:var(--theme-fg)] placeholder:opacity-50 text-[color:var(--theme-fg)] shadow-none"
+          />
+        </form>
+
+        <div className="flex gap-4 items-center">
+          <Button onClick={toggleUnits} variant="ghost" className="font-medium text-sm rounded-full hover:bg-[color:var(--theme-fg)] hover:text-[color:var(--theme-bg)] transition-colors border border-[color:var(--theme-border)]">
+            {isMetric ? '°C' : '°F'}
+          </Button>
+        </div>
       </header>
 
-      <main className="flex-1 p-3 md:p-8 flex flex-col items-center" id="main-weather-content">
-        <div className="w-full max-w-4xl">
-          {/* Search section */}
-          <section aria-label="Weather search" className="mb-4">
-            {/* Mobile search bar - below navbar */}
-            <div className="md:hidden mb-4">
-              <Sheet open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full bg-white/20 border-none text-white hover:bg-white/30 justify-start"
-                    aria-label="Open search"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Search for a city...
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="top" className="bg-gray-900/95 border-none text-white pt-16">
-                  <form onSubmit={handleSearch} className="flex flex-col gap-4">
-                    <h2 className="text-xl font-bold">Search Location</h2>
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Enter city name..."
-                      className="bg-white/20 backdrop-blur-md border-none text-white placeholder:text-white/70"
-                      aria-label="Search for a city"
-                    />
-                    <Button type="submit" className="w-full">
-                      Search
-                    </Button>
+      {/* MOBILE SEARCH */}
+      <div className="md:hidden w-full p-4 border-b border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/60 backdrop-blur-xl z-40 sticky top-20">
+         <form onSubmit={handleSearch} className="relative">
+           <Search className="absolute left-3 top-2.5 h-5 w-5 opacity-50" />
+           <Input 
+             value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+             placeholder="Search city..."
+             className="h-10 bg-transparent border border-[color:var(--theme-border)] rounded-full pl-10 text-sm focus-visible:ring-1 shadow-none"
+           />
+         </form>
+      </div>
 
-                    <RecentSearches
-                      searches={recentSearches}
-                      onSelectSearch={handleRecentSearch}
-                      onClearSearches={clearRecentSearches}
-                    />
-
-                    {favoriteLocations.length > 0 && (
-                      <div className="mt-4">
-                        <h3 className="text-sm font-medium mb-2">Favorite Locations</h3>
-                        <div className="flex flex-col gap-2">
-                          {favoriteLocations.map((location, index) => (
-                            <Button
-                              key={index}
-                              variant="outline"
-                              className="justify-start bg-white/10 hover:bg-white/20 border-none"
-                              onClick={() => {
-                                fetchWeather(location.city)
-                                setIsSearchOpen(false)
-                              }}
-                            >
-                              <MapPin className="h-4 w-4 mr-2" />
-                              {location.name}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </form>
-                </SheetContent>
-              </Sheet>
-            </div>
-
-            {/* Desktop search bar */}
-            <form onSubmit={handleSearch} className="hidden md:flex gap-2 mb-6">
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for a city..."
-                className="bg-white/20 backdrop-blur-md border-none text-white placeholder:text-white/70"
-                aria-label="Search for a city"
-              />
-              <Button type="submit" variant="secondary" size="icon" aria-label="Search">
-                <Search className="h-4 w-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="bg-white/20 border-none text-white hover:bg-white/30"
-                aria-label="Refresh weather data"
-              >
-                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-              </Button>
-
-              {weather && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleFavorite}
-                    className={cn(
-                      "bg-white/20 border-none text-white hover:bg-white/30",
-                      isFavorite() && "bg-yellow-500/30",
-                    )}
-                    aria-label={isFavorite() ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Star className={cn("h-4 w-4", isFavorite() && "fill-yellow-400")} />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={shareWeather}
-                    className="bg-white/20 border-none text-white hover:bg-white/30"
-                    aria-label="Share weather"
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowMap(!showMap)}
-                    className={cn("bg-white/20 border-none text-white hover:bg-white/30", showMap && "bg-blue-500/30")}
-                    aria-label={showMap ? "Hide weather map" : "Show weather map"}
-                  >
-                    <Layers className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-            </form>
-          </section>
-
-          {/* Mobile location and controls */}
-          <section
-            aria-label="Current location and controls"
-            className="md:hidden flex items-center justify-between mb-4"
-          >
-            {/* Location name */}
-            <div className="flex items-center flex-1 min-w-0">
-              {weather && (
-                <>
-                  <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <h1 className="text-base font-bold truncate">
-                    {weather.name}, {weather.sys.country}
-                  </h1>
-                </>
-              )}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 ml-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="bg-white/20 border-none text-white hover:bg-white/30 h-8 w-8"
-                aria-label="Refresh weather data"
-              >
-                <RefreshCw className={cn("h-3 w-3", refreshing && "animate-spin")} />
-              </Button>
-
-              {weather && (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleFavorite}
-                    className={cn(
-                      "bg-white/20 border-none text-white hover:bg-white/30 h-8 w-8",
-                      isFavorite() && "bg-yellow-500/30",
-                    )}
-                    aria-label={isFavorite() ? "Remove from favorites" : "Add to favorites"}
-                  >
-                    <Star className={cn("h-3 w-3", isFavorite() && "fill-yellow-400")} />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={shareWeather}
-                    className="bg-white/20 border-none text-white hover:bg-white/30 h-8 w-8"
-                    aria-label="Share weather"
-                  >
-                    <Share2 className="h-3 w-3" />
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowMap(!showMap)}
-                    className={cn(
-                      "bg-white/20 border-none text-white hover:bg-white/30 h-8 w-8",
-                      showMap && "bg-blue-500/30",
-                    )}
-                    aria-label={showMap ? "Hide weather map" : "Show weather map"}
-                  >
-                    <Layers className="h-3 w-3" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </section>
-
-          {/* Desktop location and controls */}
-          <section
-            aria-label="Current location and controls"
-            className="hidden md:flex items-center justify-between mb-6"
-          >
-            <div className="flex items-center gap-2 flex-1">
-              {weather && (
-                <div className="flex items-center mr-4">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  <h1 className="text-lg font-bold">
-                    {weather.name}, {weather.sys.country}
-                  </h1>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Theme toggle - desktop */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={toggleDarkMode}
-                className="bg-white/20 border-none text-white hover:bg-white/30"
-                aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
-
-              {/* Unit toggle - desktop */}
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="desktop-unit-toggle" className="text-white text-sm">
-                  °C
-                </Label>
-                <Switch
-                  id="desktop-unit-toggle"
-                  checked={!isMetric}
-                  onCheckedChange={toggleUnits}
-                  aria-label="Temperature unit toggle"
-                />
-                <Label htmlFor="desktop-unit-toggle" className="text-white text-sm">
-                  °F
-                </Label>
-              </div>
-            </div>
-          </section>
-
-          {error && (
-            <section
-              aria-label="Error message"
-              className="bg-red-500/80 text-white p-3 rounded-lg mb-4 backdrop-blur-md text-sm"
-            >
-              <p className="font-medium">{error}</p>
-              <p className="text-xs mt-1">Please try searching for a different city or check your connection.</p>
-            </section>
-          )}
-
-          {/* Weather alerts */}
-          {alerts && alerts.length > 0 && weather && (
-            <section aria-label="Weather alerts">
-              <WeatherAlerts alerts={alerts} cityName={weather.name} />
-            </section>
-          )}
-
-          {/* Weather map */}
-          {showMap && weather && (
-            <section aria-label="Interactive weather map">
-              <ErrorBoundary>
-                <Card className="bg-white/10 backdrop-blur-md border-none text-white overflow-hidden mb-4">
-                  <CardContent className="p-4">
-                    <WeatherMap lat={weather.coord.lat} lon={weather.coord.lon} cityName={weather.name} />
-                  </CardContent>
-                </Card>
-              </ErrorBoundary>
-            </section>
-          )}
-
-          {/* Current weather */}
-          <section aria-label="Current weather conditions">
-            <ErrorBoundary>
-              <Card className="bg-white/10 backdrop-blur-md border-none text-white overflow-hidden mb-4">
-                {loading ? (
-                  <CardContent className="p-4">
-                    <div className="flex flex-col gap-3">
-                      <Skeleton className="h-8 w-36 bg-white/20" />
-                      <Skeleton className="h-20 w-20 rounded-full bg-white/20" />
-                      <Skeleton className="h-6 w-24 bg-white/20" />
-                      <div className="grid grid-cols-2 gap-3 mt-3">
-                        <Skeleton className="h-16 bg-white/20" />
-                        <Skeleton className="h-16 bg-white/20" />
-                        <Skeleton className="h-16 bg-white/20" />
-                        <Skeleton className="h-16 bg-white/20" />
-                      </div>
-                    </div>
-                  </CardContent>
-                ) : weather ? (
-                  <CardContent className="p-4">
-                    <time className="text-xs text-white/80 mb-2 block">{currentDate}</time>
-
-                    <div className="flex flex-row items-center justify-between">
-                      <div className="flex flex-col items-center">
-                        <Image
-                          src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`}
-                          alt={`${weather.weather[0].description} weather icon`}
-                          width={96}
-                          height={96}
-                          className="w-20 h-20 sm:w-24 sm:h-24"
-                          priority
-                        />
-                        <p className="text-sm sm:text-base capitalize text-center">{weather.weather[0].description}</p>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-4xl sm:text-5xl font-bold">
-                          {convertTemp(weather.main.temp)}°{isMetric ? "C" : "F"}
-                        </div>
-                        <div className="text-sm sm:text-base">
-                          Feels like {convertTemp(weather.main.feels_like)}°{isMetric ? "C" : "F"}
-                        </div>
-
-                        {airQuality && (
-                          <div className="flex items-center justify-end mt-1">
-                            <div
-                              className={cn(
-                                "text-xs px-2 py-0.5 rounded-full text-white",
-                                getAirQualityLabel(airQuality.main.aqi).color,
-                              )}
-                            >
-                              Air: {getAirQualityLabel(airQuality.main.aqi).label}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <Tabs defaultValue="overview" className="mt-4">
-                      <TabsList className="bg-white/10 border-none w-full" role="tablist">
-                        <TabsTrigger
-                          value="overview"
-                          className="data-[state=active]:bg-white/20 flex-1 text-xs sm:text-sm"
-                          role="tab"
-                        >
-                          Overview
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="details"
-                          className="data-[state=active]:bg-white/20 flex-1 text-xs sm:text-sm"
-                          role="tab"
-                        >
-                          Details
-                        </TabsTrigger>
-                        {airQuality && (
-                          <TabsTrigger
-                            value="air"
-                            className="data-[state=active]:bg-white/20 flex-1 text-xs sm:text-sm"
-                            role="tab"
-                          >
-                            Air Quality
-                          </TabsTrigger>
-                        )}
-                      </TabsList>
-                      <TabsContent value="overview" className="mt-3" role="tabpanel">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Droplets className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Humidity</span>
-                            <span className="text-sm sm:text-base font-bold">{weather.main.humidity}%</span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Wind className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Wind</span>
-                            <span className="text-sm sm:text-base font-bold">
-                              {convertSpeed(weather.wind.speed)} {getSpeedUnit()}
-                            </span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Sunrise className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Sunrise</span>
-                            <span className="text-sm sm:text-base font-bold">{formatTime(weather.sys.sunrise)}</span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Sunset className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Sunset</span>
-                            <span className="text-sm sm:text-base font-bold">{formatTime(weather.sys.sunset)}</span>
-                          </div>
-                        </div>
-                      </TabsContent>
-                      <TabsContent value="details" className="mt-3" role="tabpanel">
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Thermometer className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Max Temp</span>
-                            <span className="text-sm sm:text-base font-bold">
-                              {convertTemp(weather.main.temp_max)}°{isMetric ? "C" : "F"}
-                            </span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <ThermometerSnowflake className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Min Temp</span>
-                            <span className="text-sm sm:text-base font-bold">
-                              {convertTemp(weather.main.temp_min)}°{isMetric ? "C" : "F"}
-                            </span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Gauge className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Pressure</span>
-                            <span className="text-sm sm:text-base font-bold">{weather.main.pressure} hPa</span>
-                          </div>
-                          <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                            <Wind className="h-4 w-4 mb-1 sm:h-5 sm:w-5" aria-hidden="true" />
-                            <span className="text-xs sm:text-sm">Wind Dir</span>
-                            <span className="text-sm sm:text-base font-bold">{weather.wind.deg}°</span>
-                          </div>
-                        </div>
-                      </TabsContent>
-                      {airQuality && (
-                        <TabsContent value="air" className="mt-3" role="tabpanel">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">Air Quality Index</span>
-                              <span
-                                className={cn(
-                                  "text-sm sm:text-base font-bold px-2 py-0.5 mt-1 rounded-full",
-                                  getAirQualityLabel(airQuality.main.aqi).color,
-                                )}
-                              >
-                                {getAirQualityLabel(airQuality.main.aqi).label}
-                              </span>
-                            </div>
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">PM2.5</span>
-                              <span className="text-sm sm:text-base font-bold">
-                                {airQuality.components.pm2_5} μg/m³
-                              </span>
-                            </div>
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">PM10</span>
-                              <span className="text-sm sm:text-base font-bold">{airQuality.components.pm10} μg/m³</span>
-                            </div>
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">NO₂</span>
-                              <span className="text-sm sm:text-base font-bold">{airQuality.components.no2} μg/m³</span>
-                            </div>
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">O₃</span>
-                              <span className="text-sm sm:text-base font-bold">{airQuality.components.o3} μg/m³</span>
-                            </div>
-                            <div className="bg-white/10 p-3 rounded-lg flex flex-col items-center">
-                              <span className="text-xs sm:text-sm">SO₂</span>
-                              <span className="text-sm sm:text-base font-bold">{airQuality.components.so2} μg/m³</span>
-                            </div>
-                          </div>
-                        </TabsContent>
-                      )}
-                    </Tabs>
-                  </CardContent>
-                ) : null}
-              </Card>
-            </ErrorBoundary>
-          </section>
-
-          {/* Weather forecast */}
-          {forecast && !loading && (
-            <section aria-label="Weather forecast">
-              <ErrorBoundary>
-                <Suspense fallback={<Skeleton className="h-64 w-full bg-white/10 rounded-lg" />}>
-                  <WeatherForecast forecast={forecast} isMetric={isMetric} isDarkMode={isDarkMode} />
-                </Suspense>
-              </ErrorBoundary>
-            </section>
-          )}
+      {error && (
+        <div className="w-full bg-red-500/10 text-red-500 border-b border-red-500/20 text-sm font-medium p-3 text-center z-50">
+          {error}
         </div>
-      </main>
+      )}
+
+      {/* MAIN CONTENT AREA */}
+      {weather && !loading ? (
+        <main className="flex-1 w-full max-w-7xl mx-auto flex flex-col md:flex-row pb-24 md:pb-8 pt-6 md:pt-12 px-6 md:px-12 gap-8 md:gap-16">
+          
+          {/* NAVIGATION SIDEBAR (DESKTOP) */}
+          <aside className="hidden md:flex flex-col gap-2 w-48 flex-shrink-0">
+            <h3 className="text-xs font-semibold tracking-widest opacity-50 uppercase mb-4">Menu</h3>
+            <button onClick={() => setView("HOME")} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${view === "HOME" ? "bg-[color:var(--theme-fg)] text-[color:var(--theme-bg)]" : "hover:bg-[color:var(--theme-border)]"}`}>
+              <Home size={18} /> Overview
+            </button>
+            <button onClick={() => setView("FORECAST")} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${view === "FORECAST" ? "bg-[color:var(--theme-fg)] text-[color:var(--theme-bg)]" : "hover:bg-[color:var(--theme-border)]"}`}>
+              <Calendar size={18} /> Forecast
+            </button>
+            <button onClick={() => setView("MAP")} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-medium ${view === "MAP" ? "bg-[color:var(--theme-fg)] text-[color:var(--theme-bg)]" : "hover:bg-[color:var(--theme-border)]"}`}>
+              <MapIcon size={18} /> Live Radar
+            </button>
+          </aside>
+
+          {/* DYNAMIC VIEW CONTAINER */}
+          <div className="flex-1 flex flex-col min-h-0 w-full">
+            
+            {view === "HOME" && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-12">
+                
+                {/* HERO SECTION */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8">
+                  <div className="flex flex-col">
+                    <h1 className="text-4xl md:text-6xl font-light tracking-tight mb-2">
+                      {weather.name}, <span className="font-semibold">{weather.sys.country}</span>
+                    </h1>
+                    <p className="text-lg md:text-xl opacity-70 font-medium capitalize flex items-center gap-2">
+                      {weather.weather[0].description}
+                    </p>
+                  </div>
+                  
+                  <div className="text-[120px] md:text-[160px] font-light leading-none tracking-tighter">
+                    {convertTemp(weather.main.temp)}°
+                  </div>
+                </div>
+
+                {/* ELEGANT DATA GRID */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Wind size={16} className="text-sky-400" /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Wind</span>
+                    </div>
+                    <div className="text-3xl font-light mb-1">{convertSpeed(weather.wind.speed)}</div>
+                    <div className="text-sm font-medium opacity-70">{getSpeedUnit()}</div>
+                  </div>
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Droplets size={16} className="text-cyan-400" /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Humidity</span>
+                    </div>
+                    <div className="text-3xl font-light mb-1">{weather.main.humidity}%</div>
+                    <div className="text-sm font-medium opacity-70">Dew point: {convertTemp(weather.main.temp - ((100 - weather.main.humidity)/5))}°</div>
+                  </div>
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Thermometer size={16} className="text-orange-400" /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Feels Like</span>
+                    </div>
+                    <div className="text-3xl font-light mb-1">{convertTemp(weather.main.feels_like)}°</div>
+                    <div className="text-sm font-medium opacity-70">Actual: {convertTemp(weather.main.temp)}°</div>
+                  </div>
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Gauge size={16} className="text-purple-400" /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Pressure</span>
+                    </div>
+                    <div className="text-3xl font-light mb-1">{weather.main.pressure}</div>
+                    <div className="text-sm font-medium opacity-70">hPa</div>
+                  </div>
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Activity size={16} className={airQuality ? getAirQualityLabel(airQuality.main.aqi).color : "text-slate-400"} /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Air Quality</span>
+                    </div>
+                    <div className={`text-3xl font-light mb-1 ${airQuality ? getAirQualityLabel(airQuality.main.aqi).color : ""}`}>{airQuality ? getAirQualityLabel(airQuality.main.aqi).label : "N/A"}</div>
+                    <div className="text-sm font-medium opacity-70">Index: {airQuality ? airQuality.main.aqi : "-"}</div>
+                  </div>
+                  {/* Item */}
+                  <div className="flex flex-col p-6 rounded-2xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/40 backdrop-blur-md">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CloudRain size={16} className="text-indigo-300" /> <span className="text-xs font-semibold uppercase tracking-widest opacity-60">Visibility</span>
+                    </div>
+                    <div className="text-3xl font-light mb-1">{(weather.visibility ? weather.visibility / 1000 : 10).toFixed(1)}</div>
+                    <div className="text-sm font-medium opacity-70">km</div>
+                  </div>
+                </div>
+
+                {/* SOLAR TRAJECTORY WIDGET */}
+                <div className="w-full flex flex-col p-8 md:p-10 rounded-3xl border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/20 backdrop-blur-md pb-24 md:pb-28">
+                  <div className="flex items-center gap-2 mb-8 md:mb-12">
+                    <Sunrise size={20} className="text-amber-400" /> <span className="text-sm font-semibold uppercase tracking-widest opacity-60">Solar Trajectory</span>
+                  </div>
+                  
+                  <div className="relative w-full max-w-2xl mx-auto h-32 md:h-48 flex flex-col justify-end">
+                    {/* SVG Arc */}
+                    <svg viewBox="0 0 200 110" className="w-full h-full overflow-visible">
+                      <path d="M 10 100 A 90 90 0 0 1 190 100" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="2" strokeDasharray="4 4" />
+                      
+                      {(() => {
+                        const nowUnix = Date.now() / 1000;
+                        let sunPercent = 0;
+                        if (nowUnix > weather.sys.sunset) sunPercent = 100;
+                        else if (nowUnix > weather.sys.sunrise) sunPercent = ((nowUnix - weather.sys.sunrise) / (weather.sys.sunset - weather.sys.sunrise)) * 100;
+                        
+                        const sunAngle = Math.PI - (sunPercent/100) * Math.PI;
+                        const sunX = 100 + 90 * Math.cos(sunAngle);
+                        const sunY = 100 - 90 * Math.sin(sunAngle);
+                        
+                        return (
+                          <>
+                            {sunPercent > 0 && sunPercent < 100 && (
+                              <path 
+                                d={`M 10 100 A 90 90 0 0 1 ${sunX} ${sunY}`} 
+                                fill="none" 
+                                stroke="currentColor" 
+                                strokeWidth="3" 
+                              />
+                            )}
+                            <circle 
+                              cx={sunX} 
+                              cy={sunY} 
+                              r="4" 
+                              fill="currentColor" 
+                            />
+                            <circle 
+                              cx={sunX} 
+                              cy={sunY} 
+                              r="12" 
+                              fill="currentColor" 
+                              fillOpacity="0.2"
+                            />
+                          </>
+                        )
+                      })()}
+                    </svg>
+                    
+                    <div className="absolute bottom-0 left-0 translate-y-[140%] flex flex-col items-start">
+                      <span className="text-xs font-semibold opacity-50 uppercase tracking-widest mb-1">Sunrise</span>
+                      <span className="text-2xl font-light">{formatTime(weather.sys.sunrise)}</span>
+                    </div>
+                    
+                    <div className="absolute bottom-0 right-0 translate-y-[140%] flex flex-col items-end">
+                      <span className="text-xs font-semibold opacity-50 uppercase tracking-widest mb-1">Sunset</span>
+                      <span className="text-2xl font-light">{formatTime(weather.sys.sunset)}</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {view === "FORECAST" && forecast && (
+               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full">
+                 <h2 className="text-3xl font-light mb-8">7-Day Forecast</h2>
+                 <WeatherForecast forecast={forecast} isMetric={isMetric} theme={theme} />
+               </motion.div>
+            )}
+
+            {view === "MAP" && weather && (
+               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full flex-1 min-h-[60vh] md:min-h-[70vh] flex flex-col">
+                 <h2 className="text-3xl font-light mb-6">Live Radar</h2>
+                 <div className="w-full flex-1 rounded-3xl overflow-hidden border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/20 backdrop-blur-sm relative z-10 flex flex-col">
+                   <WeatherMap lat={weather.coord.lat} lon={weather.coord.lon} cityName={weather.name} />
+                 </div>
+               </motion.div>
+            )}
+          </div>
+        </main>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center opacity-50">
+          <CloudRain className="w-12 h-12 mb-4 animate-bounce" />
+          <div className="text-xl font-light tracking-wider">Syncing atmosphere...</div>
+        </div>
+      )}
+
+      {/* MOBILE BOTTOM NAVIGATION */}
+      <nav className="md:hidden fixed bottom-0 w-full h-[80px] bg-[color:var(--theme-bg)]/80 backdrop-blur-xl border-t border-[color:var(--theme-border)] flex z-[100] pb-safe">
+        <button onClick={() => setView("HOME")} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === "HOME" ? "text-[color:var(--theme-fg)]" : "opacity-40 hover:opacity-100"}`}>
+          <Home size={20} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest">Home</span>
+        </button>
+        <button onClick={() => setView("FORECAST")} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === "FORECAST" ? "text-[color:var(--theme-fg)]" : "opacity-40 hover:opacity-100"}`}>
+          <Calendar size={20} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest">Forecast</span>
+        </button>
+        <button onClick={() => setView("MAP")} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === "MAP" ? "text-[color:var(--theme-fg)]" : "opacity-40 hover:opacity-100"}`}>
+          <MapIcon size={20} />
+          <span className="text-[10px] font-semibold uppercase tracking-widest">Radar</span>
+        </button>
+      </nav>
     </div>
   )
 }

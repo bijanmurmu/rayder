@@ -1,244 +1,108 @@
-# Rayder ☁️ - Modern Weather Application
+# Rayder ☁️ - Cinematic Weather Engine
 
-A beautiful, responsive weather application built with Next.js 15, featuring real-time weather data, interactive maps, and a modern UI design.
+A visually stunning, high-performance weather application built with Next.js 16. Rayder abandons the standard, cluttered weather app UI in favor of a **Cinematic Minimalist** aesthetic—featuring deep translucent glassmorphism, dynamic contextual gradients, and highly polished micro-interactions. 
 
-![Rayder Weather App](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
+![Rayder Weather App](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-## ✨ Features
+## ✨ Premium Features
 
-- 🌤️ **Real-time Weather Data** - Current weather conditions with detailed metrics
-- 📊 **6-Day Forecast** - Extended weather predictions with hourly breakdowns
-- 🗺️ **Interactive Weather Maps** - Temperature, precipitation, clouds, and wind layers
-- 🌍 **Global Location Search** - Search weather for any city worldwide
-- 📱 **Responsive Design** - Optimized for desktop, tablet, and mobile devices
-- 🌙 **Dark/Light Mode** - Automatic theme detection with manual toggle
-- ⭐ **Favorite Locations** - Save and quickly access your preferred locations
-- 🔄 **Auto-refresh** - Automatic data updates with manual refresh option
-- 💨 **Air Quality Index** - Real-time air pollution data
-- ⚠️ **Weather Alerts** - Severe weather warnings and notifications
-- 📤 **Share Weather** - Share current weather conditions
-- 🎨 **Dynamic Backgrounds** - Weather-responsive background themes
-- 🔍 **Search History** - Quick access to recently searched locations
-- ♿ **Accessibility** - Full keyboard navigation and screen reader support
-- 🚀 **PWA Ready** - Progressive Web App capabilities
+- 🎭 **Cinematic Minimalist UX:** Deep slate tones, vibrant accent colors, and precise geometric layouts.
+- 🌓 **Dynamic Modal Shifting:** Forecast popups dynamically tint based on the weather—warm amber for sun, deep slate for rain, and frosted white for snow.
+- 📉 **Interactive SVG Temperature Curves:** View bespoke, mathematically generated SVG line graphs plotting the precise temperature and rain probability over the next 24 hours.
+- 🌍 **Quad-Layer Radar Engine:** High-performance integration with Windy.com offering Temperature, Precipitation, Cloud Cover, and Wind Speed maps.
+- 📍 **"Recenter" Map Auto-Pan:** A sleek, frosted-glass Floating Action Button on the radar map to instantly snap back to your location.
+- ☀️ **Solar Trajectory Widget:** A beautiful, real-time geometric arc visualizing the sun's exact position between sunrise and sunset.
+- 💨 **Contextual Metrics Grid:** Metrics (Wind, Humidity, Pressure, AQI) with meticulously colorized icons for instant scannability.
+- 🔍 **Free, No-Key Geocoding:** Powered entirely by the open-source Nominatim engine (no API keys required).
+- ☁️ **High-Fidelity Weather Data:** Powered by the incredibly accurate and free Open-Meteo API.
 
-## 🛠️ Tech Stack
+## 🛠️ Architecture & Tech Stack
 
-- **Framework**: Next.js 15 (App Router)
+Rayder is engineered to be **100% free to run and host**, eliminating legacy dependencies on paid weather keys (like OpenWeatherMap). 
+
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: Radix UI + shadcn/ui
+- **Styling**: Tailwind CSS (Native Vanilla CSS Tokens)
 - **Icons**: Lucide React
-- **API**: OpenWeatherMap API
-- **Deployment**: Vercel (recommended)
+- **Weather Provider**: [Open-Meteo](https://open-meteo.com/) (100% Free & Open Source)
+- **Geocoding**: [Nominatim OpenStreetMap](https://nominatim.org/)
+- **Radar Engine**: Windy.com Embed API
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-
 - Node.js 18+ 
 - npm, yarn, or pnpm
-- OpenWeatherMap API key
 
 ### Installation
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/bijanmurmu/Rayder.git
    cd Rayder
-   \`\`\`
+   ```
 
 2. **Install dependencies**
-   \`\`\`bash
+   ```bash
    npm install
-   # or
-   yarn install
-   # or
-   pnpm install
-   \`\`\`
+   ```
 
 3. **Set up environment variables**
-   \`\`\`bash
+   ```bash
    cp .env.example .env.local
-   \`\`\`
+   ```
    
-   Edit `.env.local` and add your OpenWeatherMap API key:
-   \`\`\`env
-   OPENWEATHERMAP_API_KEY=your_api_key_here
-   \`\`\`
+   Edit `.env.local`. **No API keys are required for weather or geocoding!** You only need to set the `NEXT_PUBLIC_APP_URL` for SEO generation:
+   ```env
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   ```
 
 4. **Run the development server**
-   \`\`\`bash
+   ```bash
    npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
-   \`\`\`
+   ```
 
 5. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-## 🔑 API Setup
-
-### Getting OpenWeatherMap API Key
-
-1. Visit [OpenWeatherMap](https://openweathermap.org/api)
-2. Sign up for a free account
-3. Navigate to API keys section
-4. Generate a new API key
-5. Add the key to your `.env.local` file
-
-### API Endpoints Used
-
-- **Current Weather**: `/data/2.5/weather`
-- **5-Day Forecast**: `/data/2.5/forecast`
-- **Air Quality**: `/data/2.5/air_pollution`
-- **Weather Alerts**: `/data/2.5/onecall`
-- **Geocoding**: `/geo/1.0/direct` & `/geo/1.0/reverse`
-
 ## 📁 Project Structure
 
-\`\`\`
+```
 Rayder/
 ├── app/                          # Next.js App Router
-│   ├── api/                      # API routes
-│   │   ├── weather/              # Weather data endpoint
-│   │   ├── forecast/             # Forecast data endpoint
-│   │   ├── air-quality/          # Air quality endpoint
-│   │   ├── alerts/               # Weather alerts endpoint
-│   │   └── geocode/              # Geocoding endpoint
-│   ├── globals.css               # Global styles
-│   ├── layout.tsx                # Root layout
-│   ├── loading.tsx               # Loading UI
-│   └── page.tsx                  # Main page
+│   ├── api/                      
+│   │   ├── weather-all/          # Consolidated Open-Meteo endpoint (Forecast, Current, AQI)
+│   │   └── geocode/              # Nominatim reverse-geocoding endpoint
+│   ├── globals.css               # Core Cinematic CSS Tokens
+│   ├── layout.tsx                # Root layout & Metadata
+│   └── page.tsx                  # Main dashboard layout
 ├── components/                   # React components
-│   ├── ui/                       # shadcn/ui components
-│   ├── error-boundary.tsx        # Error handling
-│   ├── navbar.tsx                # Navigation bar
-│   ├── recent-searches.tsx       # Search history
-│   ├── weather-alerts.tsx        # Alert notifications
-│   ├── weather-forecast.tsx      # Forecast display
-│   ├── weather-map.tsx           # Interactive maps
-│   └── theme-provider.tsx        # Theme management
-├── hooks/                        # Custom React hooks
-│   ├── use-weather-api.ts        # Weather API logic
-│   ├── use-weather-preferences.ts # User preferences
-│   └── use-toast.ts              # Toast notifications
-├── lib/                          # Utility functions
-│   └── utils.ts                  # Helper functions
-├── types/                        # TypeScript definitions
-│   └── weather.ts                # Weather data types
+│   ├── weather-forecast.tsx      # Interactive 7-Day Forecast & SVG Graphs
+│   ├── weather-map.tsx           # Quad-Layer Windy Radar Engine
+│   └── theme-provider.tsx        # Next-Themes provider
 ├── public/                       # Static assets
-│   ├── manifest.json             # PWA manifest
-│   └── icons/                    # App icons
-├── .env.example                  # Environment variables template
-├── .env.local                    # Local environment variables (gitignored)
-├── .gitignore                    # Git ignore rules
-├── next.config.mjs               # Next.js configuration
-├── package.json                  # Dependencies and scripts
-├── tailwind.config.js            # Tailwind CSS configuration
-└── tsconfig.json                 # TypeScript configuration
-\`\`\`
+│   └── icon.svg                  # Custom Geometric Radar Icon
+├── .env.local                    # Local environment variables (URL only)
+├── tailwind.config.js            # Tailwind configuration
+└── next.config.mjs               # Next.js configuration
+```
 
 ## 🌐 Deployment
 
-### Deploy to Vercel (Recommended)
+Rayder is perfectly optimized for seamless deployment on **Vercel**:
 
-1. **Push to GitHub**
-   \`\`\`bash
-   git add .
-   git commit -m "Initial commit"
-   git push origin main
-   \`\`\`
+1. Push your code to GitHub.
+2. Import the repository into your Vercel Dashboard.
+3. Set your Production `NEXT_PUBLIC_APP_URL` environment variable to your final Vercel domain (e.g., `https://rayder.vercel.app`).
+4. Deploy!
 
-2. **Deploy with Vercel**
-   - Visit [vercel.com](https://vercel.com)
-   - Import your GitHub repository
-   - Add environment variables in Vercel dashboard
-   - Deploy automatically
-
-3. **Environment Variables in Vercel**
-   - Go to Project Settings → Environment Variables
-   - Add `OPENWEATHERMAP_API_KEY` with your API key
-   - Redeploy if necessary
-
-### Deploy to Other Platforms
-
-The app can be deployed to any platform that supports Next.js:
-- **Netlify**: Use `npm run build` and deploy the `out` folder
-- **Railway**: Connect GitHub repo and add environment variables
-- **DigitalOcean**: Use App Platform with GitHub integration
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `OPENWEATHERMAP_API_KEY` | Your OpenWeatherMap API key | Yes |
-| `NEXT_PUBLIC_APP_URL` | Your app's URL (for PWA) | No |
-
-### Customization
-
-#### Changing Default Location
-Edit `app/page.tsx` and modify the fallback city:
-\`\`\`typescript
-fetchWeather("YourCity") // Change "Kolkata" to your preferred city
-\`\`\`
-
-#### Modifying Theme Colors
-Edit `tailwind.config.js` to customize the color scheme:
-\`\`\`javascript
-theme: {
-  extend: {
-    colors: {
-      // Add your custom colors here
-    }
-  }
-}
-\`\`\`
-
-### Customizing the Favicon
-
-The app comes with a default weather-themed favicon. To replace it with your own:
-
-1. Replace the source image at `public/favicon.png` with your own SVG
-2. Run the favicon generation script:
-   \`\`\`bash
-   npm run generate-favicons
-   \`\`\`
-3. This will create all necessary favicon files in various formats and sizes
-
-Alternatively, you can manually replace all icon files in the `public/icons/` directory and the `public/favicon.ico` file.
-
-## 🧪 Testing
-
-\`\`\`bash
-# Run type checking
-npm run type-check
-
-# Run linting
-npm run lint
-
-# Build for production
-npm run build
-
-# Start production server
-npm run start
-\`\`\`
-
-## 📱 PWA Features
-
-The app includes Progressive Web App capabilities:
-- **Offline Support**: Basic offline functionality
-- **Install Prompt**: Add to home screen on mobile devices
-- **App-like Experience**: Full-screen mode on mobile
-- **Fast Loading**: Optimized performance and caching
+Because the application uses Open-Meteo and Nominatim, there are **no secret API keys** to leak, making it incredibly secure and easy to fork.
 
 ## 🤝 Contributing
+
+We welcome contributions to push the Cinematic Minimalist design even further! 
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -246,45 +110,12 @@ The app includes Progressive Web App capabilities:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Use semantic commit messages
-- Add proper error handling
-- Include accessibility features
-- Test on multiple devices
-- Update documentation as needed
-
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- [OpenWeatherMap](https://openweathermap.org/) for weather data API
-- [shadcn/ui](https://ui.shadcn.com/) for beautiful UI components
-- [Lucide](https://lucide.dev/) for icons
-- [Vercel](https://vercel.com/) for hosting platform
-
-## 📞 Support
-
-If you have any questions or need help:
-- Open an issue on GitHub
-- Check the [documentation](https://github.com/bijanmurmu/Rayder/wiki)
-- Contact: [your-email@example.com]
-
-## 🔄 Changelog
-
-### v1.0.0 (Latest)
-- Initial release
-- Real-time weather data
-- Interactive maps
-- Dark/light mode
-- Responsive design
-- PWA support
-
 ---
 
-**Made with ❤️ by [Bijan Murmu](https://github.com/bijanmurmu)**
+**Designed and Engineered with ❤️ by [Bijan Murmu](https://github.com/bijanmurmu)**
 
-⭐ Star this repository if you found it helpful!
+⭐ Star this repository if you love the cinematic design!

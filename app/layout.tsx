@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
+import "leaflet/dist/leaflet.css"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 
@@ -83,6 +84,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   category: "weather",
   icons: [
+    { rel: "icon", url: "/icon.svg", type: "image/svg+xml" },
     { rel: "icon", url: "/favicon.ico" },
     { rel: "icon", url: "/icons/icon-16.png", sizes: "16x16", type: "image/png" },
     { rel: "icon", url: "/icons/icon-32.png", sizes: "32x32", type: "image/png" },
@@ -115,6 +117,7 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://openweathermap.org" />
 
         {/* Favicon - Additional explicit declarations for better browser support */}
+        <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
