@@ -56,6 +56,7 @@ export default function WeatherApp() {
           }
         },
         () => fetchWeather("Kolkata"),
+        { timeout: 3000, maximumAge: 300000 }
       )
     } else {
       fetchWeather("Kolkata")
