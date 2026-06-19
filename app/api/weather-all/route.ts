@@ -19,18 +19,19 @@ export async function GET(request: Request) {
     
     const { latitude, longitude, name, country } = geoData.results[0];
 
-    // 2. Fetch everything in parallel
-    const [weatherRes, forecastRes, aqRes] = await Promise.all([
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&timezone=auto`),
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,surface_pressure,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`),
+    // 2. Fetch everything in parallel (merged weather & forecast into 1 call)
+    const [weatherForecastRes, aqRes] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m&daily=sunrise,sunset&hourly=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation_probability,surface_pressure,weather_code,wind_speed_10m,wind_direction_10m&timezone=GMT`),
       fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${latitude}&longitude=${longitude}&current=european_aqi,carbon_monoxide,nitrogen_dioxide,ozone,sulphur_dioxide,pm10,pm2_5,ammonia`)
     ]);
 
-    const [weatherData, forecastData, aqData] = await Promise.all([
-      weatherRes.ok ? weatherRes.json() : null,
-      forecastRes.ok ? forecastRes.json() : null,
+    const [weatherForecastData, aqData] = await Promise.all([
+      weatherForecastRes.ok ? weatherForecastRes.json() : null,
       aqRes.ok ? aqRes.json() : null,
     ]);
+
+    const weatherData = weatherForecastData;
+    const forecastData = weatherForecastData;
 
     // Map Weather
     const wmoToOwm = (code: number) => {
@@ -47,8 +48,8 @@ export async function GET(request: Request) {
       timezone: weatherData.utc_offset_seconds,
       sys: {
         country: country || "",
-        sunrise: new Date(weatherData.daily?.sunrise?.[0] || Date.now()).getTime() / 1000,
-        sunset: new Date(weatherData.daily?.sunset?.[0] || Date.now()).getTime() / 1000,
+        sunrise: weatherData.daily?.sunrise?.[0] ? new Date(weatherData.daily.sunrise[0] + "Z").getTime() / 1000 : Date.now() / 1000,
+        sunset: weatherData.daily?.sunset?.[0] ? new Date(weatherData.daily.sunset[0] + "Z").getTime() / 1000 : Date.now() / 1000,
       },
       weather: [wmoToOwm(weatherData.current.weather_code)],
       main: {
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
         speed: weatherData.current.wind_speed_10m,
         deg: weatherData.current.wind_direction_10m,
       },
-      dt: new Date(weatherData.current.time).getTime() / 1000,
+      dt: new Date(weatherData.current.time + "Z").getTime() / 1000,
       coord: { lat: latitude, lon: longitude },
       visibility: 10000 // default
     } : null;
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
     if (forecastData) {
       for (let i = 0; i < 120 && i < forecastData.hourly.time.length; i += 3) {
          list.push({
-            dt: new Date(forecastData.hourly.time[i]).getTime() / 1000,
+            dt: new Date(forecastData.hourly.time[i] + "Z").getTime() / 1000,
             main: {
               temp: forecastData.hourly.temperature_2m[i],
               feels_like: forecastData.hourly.apparent_temperature[i],
