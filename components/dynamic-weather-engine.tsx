@@ -58,9 +58,9 @@ export default function DynamicWeatherEngine({ weatherId, windSpeed, isDay, them
       // Clear canvas (background color is handled by CSS in page.tsx)
       ctx.clearRect(0, 0, width, height)
 
-      // Use theme FG color for particles
-      ctx.fillStyle = themeFg || "#ffffff"
-      ctx.strokeStyle = themeFg || "#ffffff"
+      // Use white for particles (opacity handles the blending)
+      ctx.fillStyle = "#ffffff"
+      ctx.strokeStyle = "#ffffff"
 
       particles.forEach((p) => {
         // Update positions

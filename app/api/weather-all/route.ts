@@ -44,6 +44,7 @@ export async function GET(request: Request) {
 
     const weather = weatherData ? {
       name: name,
+      timezone: weatherData.utc_offset_seconds,
       sys: {
         country: country || "",
         sunrise: new Date(weatherData.daily?.sunrise?.[0] || Date.now()).getTime() / 1000,
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
          });
       }
     }
-    const forecast = forecastData ? { list, city: { name, country: country || "" } } : null;
+    const forecast = forecastData ? { list, city: { name, country: country || "", timezone: forecastData.utc_offset_seconds } } : null;
 
     // Map AQ
     let airQuality = null;

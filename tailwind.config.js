@@ -8,6 +8,9 @@ module.exports = {
     "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   theme: {
     container: {
       center: true,

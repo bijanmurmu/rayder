@@ -20,8 +20,8 @@ export default function WeatherMap({ lat, lon, cityName }) {
   )
 
   return (
-    <div className="w-full h-full flex flex-col p-4 md:p-6">
-      <div className="flex w-full flex-wrap pb-4 gap-2">
+    <div className="w-full h-full flex flex-col">
+      <div className="flex w-full flex-wrap px-4 md:px-6 pt-4 md:pt-6 pb-4 gap-2">
         {["temp", "rain", "clouds", "wind"].map((type) => (
           <button
             key={type}
@@ -37,7 +37,7 @@ export default function WeatherMap({ lat, lon, cityName }) {
         ))}
       </div>
 
-      <div className="relative flex-1 w-full rounded-2xl overflow-hidden border border-[color:var(--theme-border)] bg-[#0F172A] min-h-[50vh] md:min-h-0 shadow-2xl shadow-black/20">
+      <div className="relative flex-1 w-full rounded-none md:rounded-2xl overflow-hidden border-t md:border border-[color:var(--theme-border)] bg-[#0F172A] min-h-[70vh] md:min-h-0 shadow-2xl shadow-black/20">
         
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center font-light tracking-widest text-sm opacity-50 z-50 pointer-events-none bg-[color:var(--theme-bg)]">

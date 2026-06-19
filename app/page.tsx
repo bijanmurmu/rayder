@@ -6,16 +6,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useWeatherApi } from "@/hooks/use-weather-api"
 import { useWeatherPreferences } from "@/hooks/use-weather-preferences"
-import WeatherForecast from "@/components/weather-forecast"
 import dynamic from "next/dynamic"
-import DynamicWeatherEngine from "@/components/dynamic-weather-engine"
 import { Search, Map as MapIcon, Calendar, Home, Wind, Droplets, Thermometer, CloudRain, Sunrise, Sunset, Gauge, Activity } from "lucide-react"
 
+const WeatherForecast = dynamic(() => import("@/components/weather-forecast"), { ssr: false, loading: () => <div className="w-full h-64 animate-pulse bg-white/5 rounded-3xl" /> })
+const DynamicWeatherEngine = dynamic(() => import("@/components/dynamic-weather-engine"), { ssr: false })
 const WeatherMap = dynamic(() => import("@/components/weather-map"), { ssr: false })
 
 export default function WeatherApp() {
   const [searchQuery, setSearchQuery] = useState("")
   const [view, setView] = useState("HOME") 
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   const searchInputRef = useRef(null)
 
   const { preferences, toggleUnits } = useWeatherPreferences()
@@ -63,7 +64,7 @@ export default function WeatherApp() {
 
   const handleSearch = (e) => {
     e.preventDefault()
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && !loading) {
       fetchWeather(searchQuery)
       setSearchQuery("")
       setView("HOME")
@@ -94,7 +95,9 @@ export default function WeatherApp() {
   }
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+    if (!weather) return "";
+    const d = new Date((timestamp + weather.timezone) * 1000);
+    return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
   }
 
   const isDay = weather ? (Date.now() / 1000 > weather.sys.sunrise && Date.now() / 1000 < weather.sys.sunset) : true
@@ -108,12 +111,12 @@ export default function WeatherApp() {
     if (id >= 200 && id <= 232) return { bg: "#111827", fg: "#E5E7EB", border: "rgba(255,255,255,0.1)" } 
     // Rain/Drizzle - Muted slate blue
     if (id >= 300 && id <= 531) return { bg: "#1E293B", fg: "#F8FAFC", border: "rgba(255,255,255,0.15)" } 
-    // Snow - Frosty silver
-    if (id >= 600 && id <= 622) return { bg: "#E2E8F0", fg: "#0F172A", border: "rgba(0,0,0,0.1)" } 
+    // Snow - Frosty silver (Day), Dark slate (Night)
+    if (id >= 600 && id <= 622) return isDay ? { bg: "#E2E8F0", fg: "#0F172A", border: "rgba(0,0,0,0.1)" } : { bg: "#1E293B", fg: "#F8FAFC", border: "rgba(255,255,255,0.1)" }
     // Clear
-    if (id === 800) return isDay ? { bg: "#5DA2D5", fg: "#FFFFFF", border: "rgba(255,255,255,0.2)" } : { bg: "#0F172A", fg: "#F8FAFC", border: "rgba(255,255,255,0.1)" }
+    if (id === 800) return isDay ? { bg: "#3B82F6", fg: "#FFFFFF", border: "rgba(255,255,255,0.2)" } : { bg: "#0F172A", fg: "#F8FAFC", border: "rgba(255,255,255,0.1)" }
     // Clouds
-    if (id >= 801 && id <= 804) return isDay ? { bg: "#94A3B8", fg: "#FFFFFF", border: "rgba(255,255,255,0.2)" } : { bg: "#1E293B", fg: "#E2E8F0", border: "rgba(255,255,255,0.1)" }
+    if (id >= 801 && id <= 804) return isDay ? { bg: "#CBD5E1", fg: "#0F172A", border: "rgba(0,0,0,0.1)" } : { bg: "#1E293B", fg: "#E2E8F0", border: "rgba(255,255,255,0.1)" }
     
     return { bg: "#0F172A", fg: "#FFFFFF", border: "rgba(255,255,255,0.1)" }
   }
@@ -160,6 +163,8 @@ export default function WeatherApp() {
            <Search className="absolute left-3 top-2.5 h-5 w-5 opacity-50" />
            <Input 
              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+             onFocus={() => setIsSearchFocused(true)}
+             onBlur={() => setIsSearchFocused(false)}
              placeholder="Search city..."
              className="h-10 bg-transparent border border-[color:var(--theme-border)] rounded-full pl-10 text-sm focus-visible:ring-1 shadow-none"
            />
@@ -295,19 +300,23 @@ export default function WeatherApp() {
                                 strokeWidth="3" 
                               />
                             )}
-                            <circle 
-                              cx={sunX} 
-                              cy={sunY} 
-                              r="4" 
-                              fill="currentColor" 
-                            />
-                            <circle 
-                              cx={sunX} 
-                              cy={sunY} 
-                              r="12" 
-                              fill="currentColor" 
-                              fillOpacity="0.2"
-                            />
+                            {sunPercent > 0 && sunPercent < 100 && (
+                              <>
+                                <circle 
+                                  cx={sunX} 
+                                  cy={sunY} 
+                                  r="4" 
+                                  fill="currentColor" 
+                                />
+                                <circle 
+                                  cx={sunX} 
+                                  cy={sunY} 
+                                  r="12" 
+                                  fill="currentColor" 
+                                  fillOpacity="0.2"
+                                />
+                              </>
+                            )}
                           </>
                         )
                       })()}
@@ -335,9 +344,9 @@ export default function WeatherApp() {
             )}
 
             {view === "MAP" && weather && (
-               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full flex-1 min-h-[60vh] md:min-h-[70vh] flex flex-col">
+               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full flex-1 min-h-[75vh] md:min-h-[80vh] flex flex-col">
                  <h2 className="text-3xl font-light mb-6">Live Radar</h2>
-                 <div className="w-full flex-1 rounded-3xl overflow-hidden border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/20 backdrop-blur-sm relative z-10 flex flex-col">
+                 <div className="w-[calc(100%+3rem)] -mx-6 md:mx-0 md:w-full flex-1 rounded-none md:rounded-3xl overflow-hidden border-y md:border border-[color:var(--theme-border)] bg-[color:var(--theme-bg)]/20 backdrop-blur-sm relative z-10 flex flex-col">
                    <WeatherMap lat={weather.coord.lat} lon={weather.coord.lon} cityName={weather.name} />
                  </div>
                </motion.div>
@@ -352,7 +361,7 @@ export default function WeatherApp() {
       )}
 
       {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="md:hidden fixed bottom-0 w-full h-[80px] bg-[color:var(--theme-bg)]/80 backdrop-blur-xl border-t border-[color:var(--theme-border)] flex z-[100] pb-safe">
+      <nav className={`md:hidden fixed bottom-0 w-full h-[80px] bg-[color:var(--theme-bg)]/80 backdrop-blur-xl border-t border-[color:var(--theme-border)] flex z-[100] pb-safe transition-transform duration-300 ${isSearchFocused ? 'translate-y-full' : 'translate-y-0'}`}>
         <button onClick={() => setView("HOME")} className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === "HOME" ? "text-[color:var(--theme-fg)]" : "opacity-40 hover:opacity-100"}`}>
           <Home size={20} />
           <span className="text-[10px] font-semibold uppercase tracking-widest">Home</span>

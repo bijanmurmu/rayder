@@ -33,19 +33,21 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
 
   // Group forecast data by day
   const groupByDay = (data) => {
-    // Use a more efficient date formatting approach
-    const dateFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" })
+    // Use UTC timeZone to format the shifted date correctly
+    const dateFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" })
     const fullDateFormatter = new Intl.DateTimeFormat("en-US", {
       day: "2-digit",
       month: "short",
+      timeZone: "UTC"
     })
 
     const grouped = {}
+    const timezoneOffset = data.city?.timezone ?? 0;
 
     data.list.forEach((item) => {
-      // Get full date object for each forecast item
-      const date = new Date(item.dt * 1000)
-      // Format as "Mon, 08 Mar" (day, date month)
+      // Shift the timestamp by the city's timezone offset
+      const date = new Date((item.dt + timezoneOffset) * 1000)
+      
       const dateKey = dateFormatter.format(date)
       const fullDateStr = fullDateFormatter.format(date)
 
@@ -64,10 +66,12 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
   }
 
   const getDailyData = (dayData) => {
+    const timezoneOffset = forecast.city?.timezone ?? 0;
+    
     // Get the middle of the day forecast (around noon) or the first entry
     const middayForecast =
       dayData.items.find((item) => {
-        const hour = new Date(item.dt * 1000).getHours()
+        const hour = new Date((item.dt + timezoneOffset) * 1000).getUTCHours()
         return hour >= 11 && hour <= 14
       }) || dayData.items[0]
 
@@ -101,7 +105,7 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
       humidity: middayForecast.main.humidity,
       windSpeed: avgWindSpeed,
       hourlyData: dayData.items.map((item) => ({
-        time: new Date(item.dt * 1000).getHours(),
+        time: new Date((item.dt + (forecast.city?.timezone ?? 0)) * 1000).getUTCHours(),
         temp: item.main.temp,
         icon: item.weather[0].icon,
         description: item.weather[0].description,
@@ -204,35 +208,56 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
           return (
             <div
               key={day}
-              className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/20 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/40 transition-colors cursor-pointer group"
+              role="button"
+              tabIndex={0}
+              className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/20 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/30 hover:-translate-y-1 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--theme-fg)] transition-all duration-300 cursor-pointer group"
               onClick={() => handleDayClick(day)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleDayClick(day);
+                }
+              }}
             >
-              <div className="font-medium text-xl md:text-2xl tracking-tight">{day}</div>
-              <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{dayData.fullDate}</div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-medium text-xl md:text-2xl tracking-tight">{day}</div>
+                  <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{dayData.fullDate}</div>
+                </div>
+                {forecast.icon && (
+                  <img 
+                    src={`https://openweathermap.org/img/wn/${forecast.icon}@2x.png`} 
+                    alt={forecast.description}
+                    className="w-12 h-12 md:w-16 md:h-16 object-contain -mt-2 -mr-2 drop-shadow-sm opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all"
+                  />
+                )}
+              </div>
               
-              <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight break-words hyphens-auto line-clamp-3">
+              <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight break-words hyphens-auto line-clamp-2">
                 {forecast.description}
               </div>
               
-              <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex justify-between items-end gap-2">
-                <div className="flex flex-col w-12 shrink-0 gap-1.5">
-                  <div className="flex items-center gap-1 opacity-70">
-                    <CloudRain size={10} className="text-blue-400" />
-                    <span className="text-[9px] font-semibold tracking-widest uppercase">Rain</span>
+              <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex flex-col gap-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1.5 opacity-60">
+                    <Thermometer size={12} />
+                    <span className="text-[10px] font-semibold tracking-widest uppercase">Temp</span>
                   </div>
-                  <div className="h-1.5 w-full bg-[color:var(--theme-fg)]/10 rounded-full overflow-hidden">
+                  <div className="text-lg xl:text-xl font-medium whitespace-nowrap">
+                    {convertTemp(forecast.maxTemp)}°<span className="opacity-50 text-xs xl:text-sm ml-0.5">/{convertTemp(forecast.minTemp)}°</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-1.5 opacity-80">
+                    <CloudRain size={12} className="text-blue-400" />
+                    <span className="text-[10px] font-semibold tracking-widest uppercase text-blue-400">Rain</span>
+                  </div>
+                  <div className="flex-1 h-1.5 bg-[color:var(--theme-fg)]/10 rounded-full overflow-hidden">
                     <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.round(forecast.pop * 100)}%` }} />
                   </div>
-                  <span className="text-[10px] font-semibold tracking-wider text-blue-400/80">{Math.round(forecast.pop * 100)}%</span>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1 opacity-50">
-                    <Thermometer size={10} />
-                    <span className="text-[9px] font-semibold tracking-widest uppercase">Temp</span>
-                  </div>
-                  <div className="text-xl font-medium whitespace-nowrap">
-                    {convertTemp(forecast.maxTemp)}°<span className="opacity-50 text-sm ml-1">/{convertTemp(forecast.minTemp)}°</span>
-                  </div>
+                  <span className="text-[10px] font-semibold tracking-wider text-blue-400/80 w-6 text-right shrink-0">
+                    {Math.round(forecast.pop * 100)}%
+                  </span>
                 </div>
               </div>
             </div>
@@ -242,19 +267,56 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
         {extraDays.map((day, index) => (
           <div
             key={`extra-${index}`}
-            className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/10 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/30 transition-colors cursor-pointer group opacity-80 hover:opacity-100"
+            role="button"
+            tabIndex={0}
+            className="border border-[color:var(--theme-border)] rounded-2xl p-6 flex flex-col bg-[color:var(--theme-bg)]/10 backdrop-blur-md hover:bg-[color:var(--theme-bg)]/30 transition-colors cursor-pointer group opacity-80 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--theme-fg)]"
             onClick={() => handleDayClick(day, true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleDayClick(day, true);
+              }
+            }}
           >
-            <div className="font-medium text-xl md:text-2xl tracking-tight">{day.dayName}</div>
-            <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{day.fullDate}</div>
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="font-medium text-xl md:text-2xl tracking-tight">{day.dayName}</div>
+                <div className="text-sm font-medium mt-1 mb-6 opacity-60 group-hover:opacity-100 transition-opacity">{day.fullDate}</div>
+              </div>
+              {day.forecast.icon && (
+                <img 
+                  src={`https://openweathermap.org/img/wn/${day.forecast.icon}@2x.png`} 
+                  alt={day.forecast.description}
+                  className="w-12 h-12 md:w-16 md:h-16 object-contain -mt-2 -mr-2 drop-shadow-sm opacity-60 group-hover:opacity-80 transition-all grayscale"
+                />
+              )}
+            </div>
             
-            <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight opacity-70">
+            <div className="text-xl md:text-2xl font-light mb-4 capitalize leading-tight opacity-70 break-words hyphens-auto line-clamp-2">
               Estimated Trend
             </div>
             
-            <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex justify-between items-end">
-              <div className="text-xl font-medium">
-                {convertTemp(day.forecast.maxTemp)}°<span className="opacity-50 text-sm ml-1">/{convertTemp(day.forecast.minTemp)}°</span>
+            <div className="mt-auto pt-4 border-t border-[color:var(--theme-border)] flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5 opacity-60">
+                  <Thermometer size={12} />
+                  <span className="text-[10px] font-semibold tracking-widest uppercase">Temp</span>
+                </div>
+                <div className="text-lg xl:text-xl font-medium whitespace-nowrap">
+                  {convertTemp(day.forecast.maxTemp)}°<span className="opacity-50 text-xs xl:text-sm ml-0.5">/{convertTemp(day.forecast.minTemp)}°</span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center gap-2 opacity-60">
+                <div className="flex items-center gap-1.5">
+                  <CloudRain size={12} className="text-blue-400 grayscale" />
+                  <span className="text-[10px] font-semibold tracking-widest uppercase text-blue-400 grayscale">Rain</span>
+                </div>
+                <div className="flex-1 h-1.5 bg-[color:var(--theme-fg)]/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 grayscale rounded-full transition-all" style={{ width: `${Math.round(day.forecast.pop * 100)}%` }} />
+                </div>
+                <span className="text-[10px] font-semibold tracking-wider text-blue-400/80 grayscale w-6 text-right shrink-0">
+                  {Math.round(day.forecast.pop * 100)}%
+                </span>
               </div>
             </div>
           </div>
@@ -322,54 +384,56 @@ function WeatherForecast({ forecast, isMetric = true, theme }) {
                     });
 
                     return (
-                      <div className="w-full flex flex-col relative">
-                        <svg viewBox="0 0 1000 100" className="w-full h-24 overflow-visible" preserveAspectRatio="none">
-                          <defs>
-                            <linearGradient id="curveGrad" x1="0" x2="0" y1="0" y2="1">
-                              <stop offset="0%" stopColor="currentColor" stopOpacity="0.2"/>
-                              <stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
-                            </linearGradient>
-                          </defs>
-                          <polyline 
-                            points={`0,100 ${points.join(' ')} 1000,100`} 
-                            fill="url(#curveGrad)"
-                          />
-                          <polyline 
-                            points={points.join(' ')} 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="4" 
-                            vectorEffect="non-scaling-stroke"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                        
-                        <div className="flex justify-between mt-4 relative w-full px-[2%]">
-                          {items.map((hour, idx) => (
-                            <div key={idx} className="flex flex-col items-center flex-1 relative z-10">
-                              <div className="text-xs font-medium opacity-70 mb-1">{hour.time}:00</div>
-                              
-                              <div className="flex items-center gap-1 mt-1 opacity-50">
-                                <Thermometer size={10} />
-                              </div>
-                              <div className="text-lg font-medium mb-1">{convertTemp(hour.temp)}°</div>
-                              
-                              <div className="flex flex-col gap-1 items-center mt-3 w-8">
-                                <div className="flex items-center gap-1 opacity-70">
-                                  <CloudRain size={10} className="text-blue-400" />
+                      <div className="w-full overflow-x-auto pb-4 -mx-2 px-2 snap-x scrollbar-thin scrollbar-thumb-white/10">
+                        <div className="min-w-[500px] md:min-w-0 w-full flex flex-col relative">
+                          <svg viewBox="0 0 1000 100" className="w-full h-24 overflow-visible" preserveAspectRatio="none">
+                            <defs>
+                              <linearGradient id="curveGrad" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stopColor="currentColor" stopOpacity="0.2"/>
+                                <stop offset="100%" stopColor="currentColor" stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                            <polyline 
+                              points={`0,100 ${points.join(' ')} 1000,100`} 
+                              fill="url(#curveGrad)"
+                            />
+                            <polyline 
+                              points={points.join(' ')} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="4" 
+                              vectorEffect="non-scaling-stroke"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          
+                          <div className="flex justify-between mt-4 relative w-full px-[2%]">
+                            {items.map((hour, idx) => (
+                              <div key={idx} className="flex flex-col items-center flex-1 relative z-10 snap-center">
+                                <div className="text-xs font-medium opacity-70 mb-1">{hour.time}:00</div>
+                                
+                                <div className="flex items-center gap-1 mt-1 opacity-50">
+                                  <Thermometer size={10} />
                                 </div>
-                                <div className="h-8 w-1.5 bg-[color:var(--theme-fg)]/10 rounded-full flex flex-col justify-end overflow-hidden mt-1">
-                                  <div className="w-full bg-blue-500 rounded-full" style={{ height: `${hour.pop * 100}%` }} />
+                                <div className="text-lg font-medium mb-1">{convertTemp(hour.temp)}°</div>
+                                
+                                <div className="flex flex-col gap-1 items-center mt-3 w-8">
+                                  <div className="flex items-center gap-1 opacity-70">
+                                    <CloudRain size={10} className="text-blue-400" />
+                                  </div>
+                                  <div className="h-8 w-1.5 bg-[color:var(--theme-fg)]/10 rounded-full flex flex-col justify-end overflow-hidden mt-1">
+                                    <div className="w-full bg-blue-500 rounded-full" style={{ height: `${hour.pop * 100}%` }} />
+                                  </div>
+                                  {hour.pop > 0 ? (
+                                    <div className="text-[9px] font-semibold text-blue-400 mt-0.5">{(hour.pop * 100).toFixed(0)}%</div>
+                                  ) : (
+                                    <div className="text-[9px] opacity-0 mt-0.5">-</div>
+                                  )}
                                 </div>
-                                {hour.pop > 0 ? (
-                                  <div className="text-[9px] font-semibold text-blue-400 mt-0.5">{(hour.pop * 100).toFixed(0)}%</div>
-                                ) : (
-                                  <div className="text-[9px] opacity-0 mt-0.5">-</div>
-                                )}
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )
